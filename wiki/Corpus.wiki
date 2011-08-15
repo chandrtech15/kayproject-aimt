@@ -1,13 +1,19 @@
-#summary One-sentence summary of this page.
+#summary This describes the corpus used.
 
-= Introduction =
+= Installation =
 
-Add your content here.
+Corpus homepage: http://trec.nist.gov/data/t9_filtering.html
 
+To install, do something like:
+[code]
+cd <projectdir>/corpus
+wget http://trec.nist.gov/data/filtering/t9.filtering.tar.gz
+tar xvf t9.filtering.tar.gz
+[/code]
+
+and unzip.
+You will then find 
 
 = Details =
 
-Add your content here.  Format your content with:
-  * Text in *bold* or _italic_
-  * Headings, paragraphs, and lists
-  * Automatic links to other wiki pages
+Run corpus/splitCorpusIntoFiles.sh to 
