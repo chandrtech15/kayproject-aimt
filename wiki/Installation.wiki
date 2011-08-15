@@ -9,3 +9,4 @@ The overall file structure currently looks like this:
   * ./corpus/test/: Contains test document chunks (make)
 
 The setup is controlled by a bunch of makefiles in /., ext, and corpus. They will download and preprocess the corpus, and also install TreeTagger.
+If you add new external packages not included in the subversion repo, please make sure to add the installation commands to one of the makefiles.
