@@ -1,0 +1,11 @@
+The overall file structure currently looks like this:
+  * ./ext: External scripts and applications
+  * ./ext/tt: TreeTagger. Will be installed by make
+  * ./src: Our own code
+  * ./src/lexChains/: Python scripts for lexical chains
+  * ./corpus: The TREC9 filtering task corpus
+  * ./corpus/splitCorpusIntoFiles.sh: Shell script for splitting corpus files into chunks which are easier to handle
+  * ./corpus/train/: Contains training document chunks (make)
+  * ./corpus/test/: Contains test document chunks (make)
+
+The setup is controlled by a bunch of makefiles in /., ext, and corpus. They will download and preprocess the corpus, and also install TreeTagger.
