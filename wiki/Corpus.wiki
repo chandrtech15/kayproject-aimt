@@ -12,11 +12,13 @@ tar xvf t9.filtering.tar.gz
 }}}
 
 Then there should be a dir corpus/ohsu-trec, with README etc.
-The corpus as such is split into three parts: pre-test, training and test. At the beginning, we'd probably like to work with pre-test, to get everything running.
+The corpus as such can be found spread over two files: trec9-test/ohsumed.88-91 and trec9-training/ohsumed87.
 
-Run corpus/splitCorpusIntoFiles.sh on one of the ohsumed.*<year*> files to split them into separate documents. Each split file will have a filename like corpus*<ID*> with the following content:
+Run corpus/splitCorpusIntoFiles.sh on one of the ohsumed.`<`year`>` files to split them into separate documents. Each split file will have a filename like ohsumed.`<`year`>`.`<`ID`>` with the following content:
 
 {{{
 ID Identifier
 Content of file
 }}}
+
+Alternatively, use corpus/reduceCorpusToText.sh > outputFile on one of the files to remove all boilerplate information and only leave ID and document content.
