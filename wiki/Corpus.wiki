@@ -5,15 +5,18 @@
 Corpus homepage: http://trec.nist.gov/data/t9_filtering.html
 
 To install, do something like:
-[code]
+{{{
 cd <projectdir>/corpus
 wget http://trec.nist.gov/data/filtering/t9.filtering.tar.gz
 tar xvf t9.filtering.tar.gz
-[/code]
+}}}
 
-and unzip.
-You will then find 
+Then there should be a dir corpus/ohsu-trec, with README etc.
+The corpus as such is split into three parts: pre-test, training and test. At the beginning, we'd probably like to work with pre-test, to get everything running.
 
-= Details =
+Run corpus/splitCorpusIntoFiles.sh on one of the ohsumed.*<year*> files to split them into separate documents. Each split file will have a filename like corpus*<ID*> with the following content:
 
-Run corpus/splitCorpusIntoFiles.sh to 
+{{{
+ID Identifier
+Content of file
+}}}
