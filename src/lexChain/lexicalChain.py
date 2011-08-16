@@ -481,6 +481,8 @@ def lexChainWSD(taggedText, noWN=None, \
             sentpos += 1;
         parpos += 1;
     disambiged = mc.disambigAll(noWN);
+    log.debug("MC chains:")
+    log.debug(mc.chains)
     return disambiged;
 
 def finalizeLexChains(disambiged):

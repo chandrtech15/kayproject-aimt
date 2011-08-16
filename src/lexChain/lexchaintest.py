@@ -108,7 +108,7 @@ hospital arrival. The authors analyzed 271 cases of ventricular fibrillation man
         return [ch for ch in finalizeLexChains(senses) if len(ch) > 1]
           
     totalChains = []
-    with open("../corpus/ohsu-trec/pre-test/ohsumed.87","r") as f:
+    with open("../../corpus/ohsu-trec/trec9-train/ohsumed.87","r") as f:
         next = False
         counter = 1
         for line in f:
@@ -118,7 +118,7 @@ hospital arrival. The authors analyzed 271 cases of ventricular fibrillation man
                 totalChains += run(line.strip())
                 next = False
                 counter += 1
-            if counter > 5:
+            if counter > 1:
                 break
     
     print len(totalChains)
