@@ -13,8 +13,13 @@ aTagger.process(INPUT_FILE, OUTPUT_FILE)
 Command line usage:
 treetaggerIO.py treetaggerDir inputFile outFile
 '''
+import os, sys
+extDir = os.path.dirname(os.path.abspath(__file__)) + "/../../ext"
+libDir = extDir + "/tt-wrapper"
+ttDir = extDir + "/tt"
+if libDir not in sys.path:
+	sys.path.append(libDir)
 import treetaggerwrapper
-import sys
 
 class TreeTaggerIO:
     
@@ -71,6 +76,8 @@ def main(args):
     if len(args) != 3:
         print("Usage: treetaggerIO.py treetaggerDir inputFile outFile")
     else:
+        if args[0] == "default":
+            args[0] = ttDir
         #initialize tagger once
         tagger = TreeTaggerIO(args[0])
     
