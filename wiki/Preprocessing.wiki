@@ -32,7 +32,7 @@ If you don't think that replacing is an issue, I would vote for using it. Otherw
 
 == Output ==
 
-Currently the output produced by the treetaggerIO looks like this:
+Currently the output produced by the treetaggerIO.py looks like this:
 
 {{{
 1	This	this	_	DT
