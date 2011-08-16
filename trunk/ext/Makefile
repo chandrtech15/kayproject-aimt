@@ -1,5 +1,5 @@
-created: tt tt-wrapper
-	touch created
+.created: tt tt-wrapper
+	touch .created
 
 tt: 
 	mkdir tt && cd tt && \

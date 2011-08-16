@@ -1,5 +1,5 @@
-created: test train
-	touch created
+.created: test train
+	touch .created
 
 test: ohsu-trec
 	mkdir test && chmod +x ../src/preprocessing/splitCorpusIntoFiles.sh &&	../src/preprocessing/splitCorpusIntoFiles.sh ohsu-trec/trec9-test/ohsumed.88-91 100 test/test

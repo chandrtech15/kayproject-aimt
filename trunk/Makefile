@@ -1,14 +1,15 @@
-created:	corpus/created ext/created
-preprocessed: created corpus/test/*.tagged corpus/train/*.tagged
+install:	corpus/.created ext/.created
 
-corpus/test/*.tagged: created
+# Run with caution
+preprocessing: corpus/test/*.tagged corpus/train/*.tagged
+
+corpus/test/*.tagged: install
 	python src/preprocessing/treetaggerBatch.py corpus/test
 
-corpus/train/*.tagged: created
+corpus/train/*.tagged: install
 	python src/preprocessing/treetaggerBatch.py corpus/train
 
-corpus/created:
+corpus/.created:
 	make -C corpus
-ext/created:
+ext/.created:
 	make -C ext
-
