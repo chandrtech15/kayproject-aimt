@@ -2,7 +2,7 @@
 
 = How to run =
 
- * The TreeTagger wrapper can be anonymously checked out from https://subversion.cru.fr/ttpw
+ * The !TreeTagger wrapper can be anonymously checked out from https://subversion.cru.fr/ttpw
 
  * The simple class treetaggerIO.py (/src/preprocessing/) can be used to tag files and write the result into a conll09-like file in the following way:
   # TREETAGGER_DIR should point to the directory of !TreeTagger
