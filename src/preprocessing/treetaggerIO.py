@@ -35,9 +35,14 @@ class TreeTaggerIO:
         and write output to outFile
         '''
         input = open(inFile, 'r')
-        ttoutput = self.tagger.TagText(input.read()) #, notagurl=True,
-                #notagemail=True,notagip=True,notagdns=True) 
-                #uncommented opts do not work properly
+        ttoutput = []
+        for line in input:
+            if line.startswith(".I"):
+                ttoutput.append(line)
+            else:
+                ttoutput += self.tagger.TagText(line) #, notagurl=True,
+                        #notagemail=True,notagip=True,notagdns=True) 
+                        #uncommented opts do not work properly
         input.close()
     
         #output
@@ -54,7 +59,9 @@ class TreeTaggerIO:
         id = 1
         
         for entry in ttoutput:
-            if not entry.startswith("<rep"):
+            if entry.startswith(".I"):
+                outF.write(entry)
+            elif not entry.startswith("<rep"):
                 w, t, l = entry.split()
                 outF.write(str(id) + #id
                            sep + w + #word
@@ -67,6 +74,7 @@ class TreeTaggerIO:
                     outF.write("\n")
                     id = 1
                 else: id+=1
+            
             
         print "done"    
         outF.close()
