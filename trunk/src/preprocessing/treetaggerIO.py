@@ -18,7 +18,7 @@ extDir = os.path.dirname(os.path.abspath(__file__)) + "/../../ext"
 libDir = extDir + "/tt-wrapper"
 ttDir = extDir + "/tt"
 if libDir not in sys.path:
-	sys.path.append(libDir)
+    sys.path.append(libDir)
 import treetaggerwrapper
 
 class TreeTaggerIO:

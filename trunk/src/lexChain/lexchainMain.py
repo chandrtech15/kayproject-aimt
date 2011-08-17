@@ -9,24 +9,33 @@ from lexicalChain import lexChainWSD, finalizeLexChains
 import os
 import sys
 
+import logging
+log = logging.getLogger("lexchain")
+log.setLevel(logging.WARNING)
+
+def _lemmaIfAvailable(word):
+    return word[2] if word[2] != "<unknown>" else word[1]
+
 def readConll(stream):
     idLine = None
     sentences = []
     sent = []
     for line in stream:
         line = line.strip()
-        "New document?"
-        if line.startswith(".I "):
+        if not line:
+            "new sentence"
+            sentences.append(sent)
+            sent = []
+        elif line.startswith(".I "):
+            "new document"
             if sentences:
                 yield idLine,sentences
             idLine = line
             sentences = []
-        "new sentence?"
-        if not line:
-            sentences.append(sent)
-            sent = []
-        elems = line.split("\t")
-        sent.append(elems)
+        else:
+            "normal token"
+            elems = line.split("\t")
+            sent.append(elems)
     yield idLine,sentences
 
 def writeConll(stream, sentences, chainDict, idLine):
@@ -37,12 +46,12 @@ def writeConll(stream, sentences, chainDict, idLine):
         for wordnum, word in enumerate(sent):
             if wordnum > 0: 
                 stream.write("\n")
-            word[3] = chainDict.get(word, 0)
+            word[3] = str(chainDict.get(_lemmaIfAvailable(word), 0))
             stream.write("\t".join(word))
 
 def run(streamIn, streamOut):
-    for docId, sentences in readConll(streamIn):    
-        newSentences = [[(w[2] if w[2] != "<unknown>" else w[1], w[4]) for w in sentence] for sentence in sentences]
+    for docId, sentences in readConll(streamIn):
+        newSentences = [[(_lemmaIfAvailable(w), w[4]) for w in sentence] for sentence in sentences]
         "We assume there is only one paragraph"
         input = [newSentences]
         senses = lexChainWSD(input, deplural=False)
