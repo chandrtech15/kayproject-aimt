@@ -497,6 +497,6 @@ def finalizeLexChains(disambiged):
             if other.sense() != disambiged[other.word()].sense():
                 continue
             alreadyAdded.add(other)
-            lexChain.append(other)
+            lexChain.append(other.word())
         lexChains.append(lexChain)
     return lexChains 
