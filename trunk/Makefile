@@ -1,15 +1,24 @@
 install:	corpus/.created ext/.created
 
 # Run with caution
-preprocessing: corpus/test/*.tagged corpus/train/*.tagged
+preprocessing: corpus/data/test.tg corpus/data/train.tg corpus/data/devtest.tg corpus/data/devtrain.tg
 
-corpus/test/*.tagged: install
-	python src/preprocessing/treetaggerBatch.py corpus/test
+corpus/data/test.tg: install
+	python src/preprocessing/treetaggerIO.py ext/tt corpus/data/test corpus/data/test.tg
 
-corpus/train/*.tagged: install
-	python src/preprocessing/treetaggerBatch.py corpus/train
+corpus/data/train.tg: install
+	python src/preprocessing/treetaggerIO.py ext/tt corpus/data/train corpus/data/train.tg
+
+corpus/data/devtrain.tg: install
+	python src/preprocessing/treetaggerIO.py ext/tt corpus/data/devtrain corpus/data/devtrain.tg
+
+corpus/data/devtest.tg: install
+	python src/preprocessing/treetaggerIO.py ext/tt corpus/data/devtest corpus/data/devtest.tg
+
+preprocessingServer:
+	echo "Fetching preprocessed data from coli.. Please enter your coli username, followed by ENTER:" && read username && scp $username@login.coli.uni-sb.de:/home/CE.shadow/tbarth/kayproject-aimt/corpus/data/*.tg corpus/data/
 
 corpus/.created:
-	make -C corpus
+	make -C corpus .created
 ext/.created:
-	make -C ext
+	make -C ext .created

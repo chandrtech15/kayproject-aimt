@@ -39,7 +39,7 @@ def readConll(stream):
     yield idLine,sentences
 
 def writeConll(stream, sentences, chainDict, idLine):
-    stream.write(idLine)
+    stream.write(idLine+"\n")
     for sentnum, sent in enumerate(sentences):
         if sentnum > 0:
             stream.write("\n\n")
@@ -48,6 +48,7 @@ def writeConll(stream, sentences, chainDict, idLine):
                 stream.write("\n")
             word[3] = str(chainDict.get(_lemmaIfAvailable(word), 0))
             stream.write("\t".join(word))
+    stream.write("\n")
 
 def run(streamIn, streamOut):
     for docId, sentences in readConll(streamIn):
@@ -57,8 +58,7 @@ def run(streamIn, streamOut):
         senses = lexChainWSD(input, deplural=False)
         
         chainDict = {}
-        for chainNum, chain in enumerate(finalizeLexChains(senses)):
-            if len(chain) == 1: continue
+        for chainNum, chain in enumerate([ch for ch in finalizeLexChains(senses) if len(ch) > 1]):
             for word in chain:
                 chainDict[word] = chainNum + 1
         writeConll(streamOut, sentences, chainDict, docId)

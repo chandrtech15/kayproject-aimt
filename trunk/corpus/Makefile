@@ -1,11 +1,12 @@
-.created: test train
-	touch .created
-
-test: ohsu-trec
-	mkdir test && chmod +x ../src/preprocessing/splitCorpusIntoFiles.sh &&	../src/preprocessing/splitCorpusIntoFiles.sh ohsu-trec/trec9-test/ohsumed.88-91 100 test/test
-
-train: ohsu-trec
-	mkdir train && chmod +x ../src/preprocessing/splitCorpusIntoFiles.sh && ../src/preprocessing/splitCorpusIntoFiles.sh ohsu-trec/trec9-train/ohsumed.87 100 train/train
+.created: data/test data/train data/dev
+	touch .create
+data/test: ohsu-trec
+	mkdir -p data && chmod +x ../src/preprocessing/reduceCorpusToText.sh && ../src/preprocessing/reduceCorpusToText.sh ohsu-trec/trec9-test/ohsumed.88-91 > data/test
+data/train: ohsu-trec
+	mkdir -p data && chmod +x ../src/preprocessing/reduceCorpusToText.sh && ../src/preprocessing/reduceCorpusToText.sh ohsu-trec/trec9-train/ohsumed.87 > data/train
+data/dev:  data/train data/test
+	python ../src/preprocessing/createDev.py < data/train > data/dev && \
+	python ../src/preprocessing/createDev.py < data/test >> data/dev
 
 ohsu-trec: corpus.tar.gz
 	tar -xvf corpus.tar.gz && rm -f corpus.tar.gz
