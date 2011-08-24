@@ -11,4 +11,4 @@ Column 4: POS-tag
 Column 5: topic id
 Column 6: term extraction information -- head word id for a term word, otherwise 0
 
-Multiple sentences belonging to the same document are separated by a blank line and every document is preceded by a line of the form ".I <doc-id>", specifying the document id.
+Multiple sentences belonging to the same document are separated by a blank line and every document is preceded by a line of the form ".I `<doc-id>`", specifying the document id.
