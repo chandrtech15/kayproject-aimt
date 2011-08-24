@@ -13,7 +13,7 @@ corpus/data/dev.tg: install
 	python src/preprocessing/treetaggerIO.py ext/tt corpus/data/dev corpus/data/dev.tg
 
 preprocessingServer:
-	echo "Fetching preprocessed data from coli.. Please enter your coli username, followed by ENTER:" && read username && scp $username@login.coli.uni-sb.de:/home/CE.shadow/tbarth/kayproject-aimt/corpus/data/*.tg corpus/data/
+	./loadFromServer.sh
 
 corpus/.created:
 	make -C corpus .created
