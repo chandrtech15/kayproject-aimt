@@ -27,7 +27,7 @@ class MetaChain:
     Stores representations of all possible lexical chains of the words 
     given to it.
     """
-    def __init__(self, scoring):
+    def __init__(self, scoring, additionalTerms={}):
         """
         scoring = a LexScoring object
         
@@ -49,14 +49,28 @@ class MetaChain:
         # i.e.: a hyperonym is one step, a sibling is two steps (hypernym ->
         # hyponym)
         self.maxdist = self.scoring.maxWNDist();
-        log.debug("Max WN dist: "+str(self.maxdist))
-
+    
+        self.additionalTerms = additionalTerms
+    
     def __str__(self):
         """
         Returns a string representation of the class.
         """
         return 'chains: ' + str(self.chains) + "\n" + \
                 'words: ' + str(self.words);
+
+    def addChunk(self, chunk, sentpos, parpos):
+        word = " ".join(chunk)
+        if len(chunk) > 1:
+            if N.synsets(word, "n") or word in self.additionalTerms:
+                if N.synsets(word, "n"):    log.info("Synsets for "+word)
+                self.addWord(word, sentpos, parpos)
+            else:
+                for word in chunk:
+                    self.addWord(word, sentpos, parpos)
+        else:
+            self.addWord(word, sentpos, parpos)
+            
 
     def addWord(self, word, sentpos, parpos):
         """
@@ -92,9 +106,18 @@ class MetaChain:
             syns = N.synsets(word, "n")
             # if it's not in WordNet set the sense to None
             if not syns:
-                ln = LexNode(word, None);
-                self.chains[word] = [ln];
-                self.words[word] = [ln];
+                ln = LexNode(word, None)
+                self.chains[word] = [ln]
+                self.words[word] = [ln]
+                
+                relTerms = self.additionalTerms[word]
+                if relTerms:
+                    for term in relTerms:
+                        if term != word and term in self.chains:
+                            sdist = sentpos - self.sentences[term][-1] 
+                            pdist = parpos - self.paragraphs[term][-1] + 1
+                            LexLink(ln, self.chains[term][0], 0, sdist, pdist)
+                            log.info("Term connection between "+word+" and "+term)
             else:
                 syncheck = set(syns)
                 for syn in syns:
@@ -430,7 +453,7 @@ class LexLink:
 
 def lexChainWSD(taggedText, noWN=None, \
         scoring = LexScoring([1, 3], [1], [[1, 1, .5, .5], [1, .5, .3, .3]]), \
-        deplural = False):
+        deplural = False, additionalTerms={}):
     """
     disambigedWords = lexChainWSD(nltk.corpus.brown.tagged_paras(filename))
 
@@ -462,22 +485,21 @@ def lexChainWSD(taggedText, noWN=None, \
         in 's', if the 's'-less version is in WordNet then use that word
         as well.
     """
-    mc = MetaChain(scoring);
+    mc = MetaChain(scoring, additionalTerms=additionalTerms);
     sentpos = 0;
     parpos = 0;
     for para in taggedText:
         for sent in para:
-            for pair in sent:
-                if not pair:
-                    continue;
-                word = pair[0];
-                pos = pair[1];
-                # consider all nouns
+            chunk = []
+            chunks = []
+            for word, pos in sent:
                 if pos and pos[0] == 'N':
-                    if deplural and word and not N.lemmas(word, "n") and \
-                            word[-1] == 's' and N.lemmas(word[:-1], "n"):
-                        mc.addWord(word[:-1], sentpos, parpos);
-                    mc.addWord(word, sentpos, parpos);
+                    chunk.append(word)
+                else:
+                    chunks.append(chunk)
+                    chunk = []
+            for chunk in chunks:
+                mc.addChunk(chunk, sentpos, parpos);
             sentpos += 1;
         parpos += 1;
     disambiged = mc.disambigAll(noWN);
