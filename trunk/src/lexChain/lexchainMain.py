@@ -8,6 +8,7 @@ Created on 18.07.2011
 from lexicalChain import lexChainWSD, finalizeLexChains
 import os
 import sys
+import gzip
 
 import logging
 from collections import defaultdict
@@ -112,12 +113,18 @@ if __name__ == '__main__':
         if len(args) > 0 and len(args) < 3:
             sameFile = False
             "Input file"
-            streamIn = open(args[0],"r")
+            if args[0].endswith(".gz"):
+                streamIn = gzip.open(args[0], "r")
+            else:
+                streamIn = open(args[0],"r")
             if len(args) == 2:
                 if args[1] == args[0]:
                     args[1] += ".tmp"
                     sameFile = True
-                streamOut = open(args[1],"w")
+                if args[1].endswith(".gz"):
+                    streamOut = gzip.open(args[1],"w")
+                else:
+                    streamOut = open(args[1],"w")
             else:
                 streamOut = sys.stdout
             run(streamIn, streamOut, chainOutFile)
