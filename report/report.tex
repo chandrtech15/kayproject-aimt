@@ -1,0 +1,88 @@
+\documentclass[11pt, a4paper, abstraction]{scrartcl}
+%Weitere Optionen: twocolumn, twoside
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+
+% Fonts and formating
+\usepackage{amsmath}
+\usepackage{amsfonts}
+
+\newtheorem{example}{Example}
+\newcommand{\term}[1]{\textit{#1}}
+
+\title{Exploratory Insights into the Use of Shallow Semantics for Document Retrieval with Queries in Context}
+\author{Angeliki Lazaridou, Mikhail Kozhenikov, Iliana Simova, Tassilo Barth \\\{angeliki, mikhail, ilianas, tbarth\}@coli.uni-sb.de}
+\date{September 30, 2011}
+\subject{Student Project Report}
+\subtitle{Basic Algorithms in Computational Linguistics \\ %
+		Taught by Prof. Martin Kay}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We explore the effect of two shallow semantic document representations on the precision of document retrieval, namely lexical chains and topic models. We focus on the special case where queries consisting of a few search terms are embedded into a larger context, whose size ranges from a few sentences to whole documents. The context helps to create and disambiguate a sequential semantic fingerprint of the query. This representation is matched against an index built over the document collection. We use suffix trees as an index data structure and an approximate matching algorithm to allow for minor mutations of the query sequence. To evaluate the proposed method, precision and recall on the TREC-9 interactive track data set are compared to a baseline. In short, our project outcome encompasses implementations of algorithms for finding lexical chains, suffix tree creation and approxmate matching on suffix trees. Additionally, we built interfaces to existing programs as well as a pipeline to coordinate the different components.
+\end{abstract}
+
+\newpage
+
+\tableofcontents
+
+\newpage
+
+\section{Introduction and Motivation}
+
+Extended abstract plus possible applications -- discuss (very) shortly: why topic models, why lexical chains, why suffix trees, i.e. how might they help. \\
+Also overview.
+
+\section{Methodology}
+
+Refer to related work here. Describe in detail how each part affects the original documents and its role in the overall process. Also motivate decisions wrt models and algorithms (e.g. why do we use LDA (?), why do we use the lexical chain algorithm we use etc.)
+
+\subsection{Document Retrieval and Queries in Context}
+
+\subsection{Lexical Chains}
+
+\subsection{Topic Models}
+
+\subsection{Suffix Trees and Approximate Matching}
+
+\section{Implementation}
+
+Describes the pipeline, the tools used, the CONLL format
+
+\subsection{Preprocessing}
+
+\subsubsection{Tokenization, POS tagging, Lemmatization..}
+\subsubsection{Term Extraction}
+
+\subsection{Creation of the Topic Model}
+
+\subsection{Lexical Chain Building}
+
+\subsection{Index Creation and Search Process}
+
+\section{Usage}
+
+How to run it
+
+\section{Evaluation}
+
+\subsection{Setup}
+
+Data set, evaluation measures, which steps carried out on which part of the data set
+
+\subsection{Results}
+
+Lots of graphs and tables plus some describing text
+
+\subsection{Analysis}
+
+Why do the graphs look the way they look
+
+\section{Conclusion}
+
+Summarize ToC, contributions, evaluation, outlook
+
+\end{document}
