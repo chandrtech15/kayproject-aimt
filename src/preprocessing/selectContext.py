@@ -30,18 +30,20 @@ def rand(lim):
 
 with open(input,'rt') as f: lines = f.readlines()
 all, best = {}, {}
+ids = []
 for line in lines:
 	split = line.strip().split('\t') + [line]
 	rating = int(split[2])
-	id = int(split[0][4:])
+	id = split[0]
 	if not id in all.keys():
+		ids.append(id)	
 		all[id] = []
 		best[id] = []	
 	all[id].append(split);
 	if rating == 1:
 		best[id].append(split)
 selection = []
-for id in sorted(all.keys()):
+for id in ids:
 	opt = all[id]
 	if len(best[id]) > 0:
 		opt = best[id]
