@@ -60,7 +60,9 @@ class TreeTaggerIO:
         
         for entry in ttoutput:
             if entry.startswith(".I"):
+                outF.write("\n")
                 outF.write(entry)
+                id = 1
             elif not entry.startswith("<rep"):
                 w, t, l = entry.split()
                 outF.write(str(id) + #id
