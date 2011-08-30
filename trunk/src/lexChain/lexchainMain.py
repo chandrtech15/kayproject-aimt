@@ -75,7 +75,10 @@ def run(streamIn, streamOut, chainOutFile):
     "statistics"
     chainsTotal = 0
     docCounter = 0
-
+    
+    if chainOutFile:
+        chainOutStream = open(chainOutFile, "w")
+            
     for docId, sentences in readConll(streamIn):
         docCounter += 1
         newSentences = [[(_lemmaIfAvailable(w), w[4]) for w in sentence] for sentence in sentences]
@@ -87,16 +90,16 @@ def run(streamIn, streamOut, chainOutFile):
         for chain in [ch for ch in finalizeLexChains(senses) if len(ch) > 1]:
             chainsTotal += 1
             chainKey = tuple(chain)
-            chainId = chainDict[chainKey] = chainDict.get(chainKey, len(chainDict)) 
+            chainId = chainDict[chainKey] = chainDict.get(chainKey, len(chainDict))
             for word in chain:
                 chainWordDict[word] = chainId
+            if chainOutStream:
+                chainOutStream.write(str(chainId) + "|" + str(chainKey)+"\n")
         writeConll(streamOut, sentences, chainWordDict, docId)
-    
-    with open(chainOutFile,"w") as chainOutStream:
-        items = sorted(chainDict.iteritems(), key=lambda k: k[1])
-        items = [str(item[1]) + "|" + str(item[0]) for item in items]
-        chainOutStream.write("\n".join(items))
         
+    if chainOutStream:
+        chainOutStream.close()
+                
     log.info("Some stats:")
     log.info("  Total chains found:    "+str(chainsTotal))
     log.info("  Unique chains found:    "+str(len(chainDict)))
