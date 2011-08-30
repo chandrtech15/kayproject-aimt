@@ -46,6 +46,9 @@ def readConll(stream):
             sentences.append(sent)
             sent = []
         elif line.startswith(".I "):
+            "When there was no clear sentence delimiter:"
+            if sent:
+                sentences.append(sent)
             "new document"
             if sentences:
                 yield idLine,sentences
