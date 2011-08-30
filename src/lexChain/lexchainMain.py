@@ -46,9 +46,10 @@ def readConll(stream):
             sentences.append(sent)
             sent = []
         elif line.startswith(".I "):
-            "When there was no clear sentence delimiter:"
+            "When there was no clear sentence delimiter (i.e. empty line):"
             if sent:
                 sentences.append(sent)
+                sent = []
             "new document"
             if sentences:
                 yield idLine,sentences
@@ -62,15 +63,13 @@ def readConll(stream):
 
 def writeConll(stream, sentences, chainDict, idLine):
     stream.write(idLine+"\n")
-    for sentnum, sent in enumerate(sentences):
-        if sentnum > 0:
-            stream.write("\n\n")
+    for sent in sentences:
         for wordnum, word in enumerate(sent):
             if wordnum > 0: 
                 stream.write("\n")
             word[3] = str(chainDict.get(_lemmaIfAvailable(word), 0))
             stream.write("\t".join(word))
-    stream.write("\n")
+        stream.write("\n\n")
 
 def run(streamIn, streamOut, chainOutFile):
     termDict = loadTerms("corpus/mesh-terms")
@@ -78,12 +77,14 @@ def run(streamIn, streamOut, chainOutFile):
     "statistics"
     chainsTotal = 0
     docCounter = 0
+    sentCounter = 0
     
     if chainOutFile:
         chainOutStream = open(chainOutFile, "w")
             
     for docId, sentences in readConll(streamIn):
         docCounter += 1
+        sentCounter += len(sentences)
         newSentences = [[(_lemmaIfAvailable(w), w[4]) for w in sentence] for sentence in sentences]
         "We assume there is only one paragraph"
         input = [newSentences]
@@ -107,6 +108,7 @@ def run(streamIn, streamOut, chainOutFile):
     log.info("  Total chains found:    "+str(chainsTotal))
     log.info("  Unique chains found:    "+str(len(chainDict)))
     log.info("  Number docs:    "+str(docCounter))
+    log.info("  Number sentences:    "+str(sentCounter))
     log.info("  Chains/Doc:    "+str(float(chainsTotal)/docCounter))
 
 if __name__ == '__main__':
