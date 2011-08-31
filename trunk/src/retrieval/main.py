@@ -15,7 +15,19 @@ class Bm25Collection(DocCollection):
     def __init__(self, taggedDocFile):
         pass
     
-    def score(self, doc, query):
+    def match(self, query):
+        counts = {}
+        for word, _, lemma in query.getTagged():
+            token = lemma if lemma != "<unknown>" else word
+            counts[token] = counts.get(token, 0) + 1
+        ranking = self.scoreDocs(counts)
+        
+    def scoreDocs(self, queryTf):
+        "Angeliki: Start here with iterating over all docs in the collection"
+        "This function should return an ordered list of document IDs (maybe along with their scores)"
+        pass
+    
+    def score(self, docId, queryTf):
         "Copied from Whoosh"
         def bm25(idf, tf, fl, avgfl, B, K1):
             # idf - inverse document frequency
@@ -106,6 +118,9 @@ class Query:
     def preprocess(self):
         if not self.queryTagged:    self.queryTagged = Query.tagger.tagger.TagText(self.query)
         if not self.docTagged:  self.docTagged = Query.tagger.tagger.TagText(self.doc)
+        
+    def getTagged(self):
+        return self.docTagged + self.queryTagged
 
 if __name__ == '__main__':
     '''
