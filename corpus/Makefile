@@ -1,4 +1,4 @@
-.created: data/test data/train data/dev
+.created: data/test data/train data/dev data/dev.query
 	touch .created
 data/test: ohsu-trec
 	mkdir -p data && chmod +x ../src/preprocessing/reduceCorpusToText.sh && ../src/preprocessing/reduceCorpusToText.sh ohsu-trec/trec9-test/ohsumed.88-91 > data/test
