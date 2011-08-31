@@ -74,6 +74,7 @@ def writeConll(stream, sentences, chainDict, idLine):
 def run(streamIn, streamOut, chainOutFile):
     termDict = loadTerms("corpus/mesh-terms")
     chainDict = {}
+    input = []
     "statistics"
     chainsTotal = 0
     docCounter = 0
@@ -87,19 +88,22 @@ def run(streamIn, streamOut, chainOutFile):
         sentCounter += len(sentences)
         newSentences = [[(_lemmaIfAvailable(w), w[4]) for w in sentence] for sentence in sentences]
         "We assume there is only one paragraph"
-        input = [newSentences]
-        senses = lexChainWSD(input, deplural=False, additionalTerms=termDict)
-        
-        chainWordDict = {}
-        for chain in [ch for ch in finalizeLexChains(senses) if len(ch) > 1]:
-            chainsTotal += 1
-            chainKey = tuple(chain)
-            chainId = chainDict[chainKey] = chainDict.get(chainKey, len(chainDict))
-            for word in chain:
-                chainWordDict[word] = chainId
-            if chainOutStream:
-                chainOutStream.write(str(chainId) + "|" + str(chainKey)+"\n")
-        writeConll(streamOut, sentences, chainWordDict, docId)
+        input += [newSentences]
+    
+    
+    senses = lexChainWSD(input, deplural=False, additionalTerms=termDict)
+    
+    chainWordDict = {}
+    for chain in [ch for ch in finalizeLexChains(senses) if len(ch) > 1]:
+        chainsTotal += 1
+        chainKey = tuple(chain)
+        chainId = chainDict[chainKey] = chainDict.get(chainKey, len(chainDict))
+        for word in chain:
+            chainWordDict[word] = chainId
+        if chainOutStream:
+            chainOutStream.write(str(chainId) + "|" + str(chainKey)+"\n")
+    
+    #writeConll(streamOut, sentences, chainWordDict, docId)
         
     if chainOutStream:
         chainOutStream.close()

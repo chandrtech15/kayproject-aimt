@@ -143,7 +143,7 @@ class MetaChain:
                     
                     # make links to everything within our step range/max 
                     # WordNet distance
-                    for dist in range(1, self.maxdist+3):
+                    for dist in range(1, self.maxdist+2):
                         # hypers is set to the hypernyms
                         hypers = reduce(lambda x,y: x+y, \
                                 [base.hypernyms() for base in hyperbases], []);

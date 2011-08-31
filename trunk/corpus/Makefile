@@ -8,8 +8,10 @@ data/dev:  data/train data/test
 	python ../src/preprocessing/createDev.py < data/train > data/dev && \
 	python ../src/preprocessing/createDev.py < data/test >> data/dev
 data/dev.query:	data/dev ohsu-trec
-	python ../src/preprocessing/instantiateContext.py ohsu-trec/pre-test/qrels.ohsu.test.87.selection ohsu-trec/pre-test/query.ohsu.test.1-43 data/dev > data/dev.queries
-
+	cp ohsu-trec/pre-test/qrels.ohsu.test.87 ./data/dev.qrels
+	python ../src/preprocessing/selectContext.py ./data/dev.qrels
+	python ../src/preprocessing/instantiateContext.py ./data/dev.qrels.selection ohsu-trec/pre-test/query.ohsu.test.1-43 data/dev > data/dev.queries
+	
 ohsu-trec: corpus.tar.gz
 	tar -xvf corpus.tar.gz && rm -f corpus.tar.gz
 	
