@@ -16,14 +16,15 @@ class Bm25Collection(DocCollection):
         pass
     
     def score(self, doc, query):
+        "Copied from Whoosh"
         def bm25(idf, tf, fl, avgfl, B, K1):
             # idf - inverse document frequency
             # tf - term frequency in the current document
             # fl - field length in the current document
             # avgfl - average field length across documents in collection
             # B, K1 - free paramters
-    
             return idf * ((tf * (K1 + 1)) / (tf + K1 * (1 - B + B * (fl / avgfl))))
+        
         
 class Retriever:
     
