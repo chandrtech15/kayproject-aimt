@@ -89,7 +89,7 @@ class Bm25Collection(DocCollection):
                 continue
             sent = line.split('\t')
             word = sent[1+(sent[2]!="<unknown>")] 
-            if useStopWordList == 1 and not stopWords.has_key(word):
+            if useStopWordList == 1 and stopWords.has_key(word):
                 continue
             "line containing a token"
             docTokens +=1
