@@ -23,10 +23,12 @@ class DocCollection:
         raise NotImplementedError("Please implement in subclass")
     
 class Bm25Collection(DocCollection):
-    def __init__(self, taggedDocFile, B=.75 , K1=2.0, stopwordFile=None):
+    def __init__(self, taggedDocFile, B=.75 , K1=2.0, stopwordFile=None, threshold=-1):
         self.B = B
         self.K1 = K1
         self.readStopwords(stopwordFile)
+        
+        self.threshold = threshold
         
         self.docStats, self.N, self.indexOfDocs, self.lenOfDocs, self.avegD = self.readIntaggedFile(taggedDocFile)
     
@@ -120,7 +122,7 @@ class Bm25Collection(DocCollection):
             if token in self.stopWords:
                 continue
             counts[token] = counts.get(token, 0) + 1
-        ranking = [(docId, score) for docId, score in self.scoreDocs(counts) if score > 10]
+        ranking = [(docId, score) for docId, score in self.scoreDocs(counts) if score > self.threshold]
         return ranking
         
     def scoreDocs(self, queryTf):
@@ -260,6 +262,7 @@ if __name__ == '__main__':
     parser.add_option("--qrels",help="Name of a qrels file (queryId \t docId \t relevance) -- if given, retrieval results will be evaluated. Otherwise the script will only return the docIds")
     parser.add_option("--K1",help="K1 param of BM25. Default = 2.0", default=2.0, type="float")
     parser.add_option("--B",help="B param of BM25. Default = .75", default=.75, type="float")
+    parser.add_option("--threshold",help="Min value of BM25 score to include document in retrieval set. Default: 3.0", default=3.0, type="float")
     #parser.add_option("-q","--queries",help="Name of a query file (queryId \n Query \n DocId \n context) -- if given, will be used as query input. Otherwise the last positional argument(s) are taken to be queries")
     options, args = parser.parse_args()
     
@@ -270,7 +273,7 @@ if __name__ == '__main__':
         parser.print_help()
         exit(1)
     
-    collection = Bm25Collection(docFile, B=options.B, K1=options.K1, stopwordFile=options.stopwords)
+    collection = Bm25Collection(docFile, B=options.B, K1=options.K1, stopwordFile=options.stopwords, threshold=options.threshold)
     
     retriever = Retriever(queryFile, collection, options.qrels)
     results, prec, recall = retriever.retrieveBatch()
