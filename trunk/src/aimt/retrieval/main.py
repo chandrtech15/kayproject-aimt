@@ -3,13 +3,19 @@ Created on 31.08.2011
 
 @author: tass
 '''
+
+import os
 import sys
-import re
-import math
-import operator
-import gzip
+
+"bah. BAH."
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../")
 
 from aimt.preprocessing.treetaggerIO import TreeTaggerIO, ttDir
+from optparse import OptionParser
+import gzip
+import math
+import operator
+from collections import defaultdict
 
 class DocCollection:
             
@@ -17,10 +23,19 @@ class DocCollection:
         raise NotImplementedError("Please implement in subclass")
     
 class Bm25Collection(DocCollection):
-    def __init__(self, taggedDocFile, B , K1):
-        self.docStats, self.N, self.indexOfDocs, self.lenOfDocs, self.avegD = self.readIntaggedFile(taggedDocFile)
+    def __init__(self, taggedDocFile, B=.75 , K1=2.0, stopwordFile=None):
         self.B = B
         self.K1 = K1
+        self.readStopwords(stopwordFile)
+        
+        self.docStats, self.N, self.indexOfDocs, self.lenOfDocs, self.avegD = self.readIntaggedFile(taggedDocFile)
+    
+    def readStopwords(self, stopwordFile):
+        self.stopWords = {}
+        if stopwordFile:
+            with open(stopwordFile,"r") as streamIn:
+                for word in streamIn:
+                    self.stopWords[word.strip("\n")] = 0
     
     def printDocStats(self):
         print "DOCUMENT STATISTICS"
@@ -50,16 +65,7 @@ class Bm25Collection(DocCollection):
         return math.log((self.N-n+0.5)/(n+0.5))
     
     "stopWordFile: file that has a word in every new line"
-    def readIntaggedFile(self, taggedDocFile, stopWordFile=None):
-        "Read in stop word list if given"
-        useStopWordList = 0
-        if stopWordFile!=None:
-            with open(stopWordFile,"r") as streamIn:
-                stopWords = {}
-                for word in streamIn:
-                    stopWords[word.strip("\n")] = 0
-                useStopWordList = 1
-        
+    def readIntaggedFile(self, taggedDocFile):
         docStats = {}
         N = 0
         indexOfDocs = {}
@@ -75,6 +81,7 @@ class Bm25Collection(DocCollection):
         try:
             "read line by line file"
             for line in streamIn:
+                line = line.strip()
                 "Beginning of document"
                 if line.startswith(".I"):
                     if firstDoc == 0:
@@ -85,12 +92,12 @@ class Bm25Collection(DocCollection):
                     indexOfDocs[docId] = 0.0
                     N += 1
                     continue
-                "empty line (\n etc)"
-                if not line or line == '\n':
+                "empty line"
+                if not line:
                     continue
                 sent = line.split('\t')
-                word = sent[1+(sent[2]!="<unknown>")] 
-                if useStopWordList == 1 and stopWords.has_key(word):
+                word = sent[1+(sent[2]!="<unknown>")]
+                if self.stopWords.has_key(word):
                     continue
                 "line containing a token"
                 docTokens +=1
@@ -110,8 +117,11 @@ class Bm25Collection(DocCollection):
         counts = {}
         for word, _, lemma in query.getTagged():
             token = lemma if lemma != "<unknown>" else word
+            if token in self.stopWords:
+                continue
             counts[token] = counts.get(token, 0) + 1
-        ranking = self.scoreDocs(counts)
+        ranking = [(docId, score) for docId, score in self.scoreDocs(counts) if score > 10]
+        return ranking
         
     def scoreDocs(self, queryTf):
         "Angeliki: Start here with iterating over all docs in the collection"
@@ -145,17 +155,19 @@ class Retriever:
         self.qrels = self.readQrels(qrelFile)
         
     def retrieve(self, q):
-        precQuery, recQuery = 0.0, 0.0
-        found = 0
-        
         q.preprocess()
         
+        '''
+        Currently, this evaluation does not consider the rank. 
+        So we either need to find a score threshold or a fixed number of max docs.
+        I'd prefer a threshold, implemented in match.
+        '''
         matches = self.collection.match(q)
         rel = self.qrels[q.qId]
         
-        found = float(sum([1 if m in rel else 0 for m in matches]))
-        precQuery = found / len(matches)
-        recQuery = found / len(rel)
+        found = float(sum([1 if m in rel else 0 for m, _ in matches]))
+        precQuery = 0.0 if not rel else found / len(matches)
+        recQuery = 0.0 if not rel else found / len(rel)
                         
         return matches, precQuery, recQuery
     
@@ -166,6 +178,8 @@ class Retriever:
         recall = 0.0
         
         for q in self.queries:
+            print "Retrieving query "+q.qId
+            
             result = self.retrieve(q)
             prec += result[1]
             recall += result[2]
@@ -177,17 +191,18 @@ class Retriever:
         return docId in self.qrels[qId]
                         
     def readQrels(self, qrelFile):
-        qrels = {}
-        with open(qrelFile, "r") as qF:
-            for l in qF:
-                qId, docId, rel = l.strip().split("\t")
-                qrels[qId] = qrels.get(qId, set()).add(docId)
+        qrels = defaultdict(set) 
+        if qrelFile:
+            with open(qrelFile, "r") as qF:
+                for l in qF:
+                    qId, docId, _ = l.strip().split("\t")
+                    qrels[qId].add(docId)
         return qrels
     
     def readQueries(self, queryFile):
         queries = []
         with open(queryFile, "r") as qF:
-            lines = [l.strip() for l in qF.readLines()]
+            lines = [l.strip() for l in qF.readlines()]
             lNumber = 0
             while lNumber < len(lines):
                 if lines[lNumber].startswith(".Q"):
@@ -214,12 +229,19 @@ class Query:
         self.docTagged = None
         self.queryTagged = None
         
+    def tag(self, txt):
+        return [entry.split("\t") for entry in Query.tagger.tagger.TagText(txt)]
+        
     def preprocess(self):
-        if not self.queryTagged:    self.queryTagged = Query.tagger.tagger.TagText(self.query)
-        if not self.docTagged:  self.docTagged = Query.tagger.tagger.TagText(self.doc)
+        if not self.queryTagged:    
+            self.queryTagged = self.tag(self.query) 
+        if not self.docTagged:  
+            self.docTagged = self.tag(self.doc)
         
     def getTagged(self):
         return self.docTagged + self.queryTagged
+
+
 
 if __name__ == '__main__':
     '''
@@ -233,6 +255,27 @@ if __name__ == '__main__':
             - Lists of relevant document IDs for all queries
     '''
     
+    parser = OptionParser(usage=sys.argv[0]+" [options] <document collection> <file with queries>")
+    parser.add_option("-s","--stopwords",help="Name of a stopword file (one word per line) -- words therein will be filtered out from queries and documents")
+    parser.add_option("--qrels",help="Name of a qrels file (queryId \t docId \t relevance) -- if given, retrieval results will be evaluated. Otherwise the script will only return the docIds")
+    parser.add_option("--K1",help="K1 param of BM25. Default = 2.0", default=2.0, type="float")
+    parser.add_option("--B",help="B param of BM25. Default = .75", default=.75, type="float")
+    #parser.add_option("-q","--queries",help="Name of a query file (queryId \n Query \n DocId \n context) -- if given, will be used as query input. Otherwise the last positional argument(s) are taken to be queries")
+    options, args = parser.parse_args()
+    
+    try:
+        docFile = args[0]
+        queryFile = args[1]
+    except IndexError:
+        parser.print_help()
+        exit(1)
+    
+    collection = Bm25Collection(docFile, B=options.B, K1=options.K1, stopwordFile=options.stopwords)
+    
+    retriever = Retriever(queryFile, collection, options.qrels)
+    results, prec, recall = retriever.retrieveBatch()
+    print results, prec, recall
+    
 #    args = sys.argv[1:]
 #    
 #    indexFile = args[0]
@@ -241,13 +284,11 @@ if __name__ == '__main__':
 #    
 #    collection = DocCollection(indexFile)
 #    
-#    retriever = Retriever(queryFile, collection, qrelFile)
-#    _, prec, recall = retriever.retrieveBatch()
-#    print prec, recall
+
     '''
     For testing it:
     '''
-    testq = {"diagnosis":1, "design":1, "stool":1}
-    rank = Bm25Collection("corpus/data/dev.tg",0.1,0.2)
-    rank.printDocStats()
-    print rank.scoreDocs(testq)[0] #should be equal to 87196565
+#    testq = {"diagnosis":1, "design":1, "stool":1}
+#    rank = Bm25Collection("corpus/data/dev.tg",0.1,0.2)
+#    rank.printDocStats()
+#    print rank.scoreDocs(testq)[0] #should be equal to 87196565
