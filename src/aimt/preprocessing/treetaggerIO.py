@@ -14,7 +14,7 @@ Command line usage:
 treetaggerIO.py treetaggerDir inputFile outFile
 '''
 import os, sys
-extDir = os.path.dirname(os.path.abspath(__file__)) + "/../../ext"
+extDir = os.path.dirname(os.path.abspath(__file__)) + "/../../../ext"
 libDir = extDir + "/tt-wrapper"
 ttDir = extDir + "/tt"
 if libDir not in sys.path:
