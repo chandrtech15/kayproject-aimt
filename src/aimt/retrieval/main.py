@@ -9,7 +9,7 @@ import math
 import operator
 import gzip
 
-from treetaggerIO import TreeTaggerIO, ttDir
+from aimt.preprocessing.treetaggerIO import TreeTaggerIO, ttDir
 
 class DocCollection:
             
@@ -67,12 +67,12 @@ class Bm25Collection(DocCollection):
         firstDoc = 1
         docId = None
         docTokens = 0
+        " Open file depending on ending"
+        if taggedDocFile.endswith(".gz"):
+            streamIn = gzip.open(taggedDocFile, "r")
+        else:
+            streamIn = open(taggedDocFile,"r")
         try:
-            " Open file depending on ending"
-            if taggedDocFile.endswith(".gz"):
-                streamIn = gzip.open(taggedDocFile, "r")
-            else:
-                streamIn = open(taggedDocFile,"r")
             "read line by line file"
             for line in streamIn:
                 "Beginning of document"
@@ -233,22 +233,21 @@ if __name__ == '__main__':
             - Lists of relevant document IDs for all queries
     '''
     
-    args = sys.argv[1:]
-    
-    indexFile = args[0]
-    queryFile = args[1]
-    qrelFile = args[2]
-    
-    collection = DocCollection(indexFile)
-    
-    retriever = Retriever(queryFile, collection, qrelFile)
+#    args = sys.argv[1:]
+#    
+#    indexFile = args[0]
+#    queryFile = args[1]
+#    qrelFile = args[2]
+#    
+#    collection = DocCollection(indexFile)
+#    
+#    retriever = Retriever(queryFile, collection, qrelFile)
+#    _, prec, recall = retriever.retrieveBatch()
+#    print prec, recall
     '''
     For testing it:
+    '''
     testq = {"diagnosis":1, "design":1, "stool":1}
-    rank = Bm25Collection("dev.tg.gz",0.1,0.2)
+    rank = Bm25Collection("corpus/data/dev.tg",0.1,0.2)
     rank.printDocStats()
     print rank.scoreDocs(testq)[0] #should be equal to 87196565
-    '''
-    
-    _, prec, recall = retriever.retrieveBatch()
-    print prec, recall
