@@ -54,10 +54,10 @@ class Bm25Collection(DocCollection):
         "Read in stop word list if given"
         useStopWordList = 0
         if stopWordFile!=None:
-            streamIn = open(stopWordFile,"r")
-            stopWords = {}
-            for word in streamIn:
-                stopWords[word.strip("\n")] = 0
+            with open(stopWordFile,"r") as streamIn:
+                stopWords = {}
+                for word in streamIn:
+                    stopWords[word.strip("\n")] = 0
                 useStopWordList = 1
         
         docStats = {}
@@ -67,37 +67,40 @@ class Bm25Collection(DocCollection):
         firstDoc = 1
         docId = None
         docTokens = 0
-        " Open file depending on ending"
-        if taggedDocFile.endswith(".gz"):
-            streamIn = gzip.open(taggedDocFile, "r")
-        else:
-            streamIn = open(taggedDocFile,"r")
-        "read line by line file"
-        for line in streamIn:
-            "Beginning of document"
-            if line.startswith(".I"):
-                if firstDoc == 0:
-                    lenOfDocs[docId] = docTokens
-                docTokens = 0
-                firstDoc = 0
-                docId = line[3:]
-                indexOfDocs[docId] = 0.0
-                N += 1
-                continue
-            "empty line (\n etc)"
-            if not line or line == '\n':
-                continue
-            sent = line.split('\t')
-            word = sent[1+(sent[2]!="<unknown>")] 
-            if useStopWordList == 1 and stopWords.has_key(word):
-                continue
-            "line containing a token"
-            docTokens +=1
-            if not docStats.has_key(word):
-                docStats[word] = {}
-            if not docStats[word].has_key(docId):
-                docStats[word][docId] = 0
-            docStats[word][docId] +=1
+        try:
+            " Open file depending on ending"
+            if taggedDocFile.endswith(".gz"):
+                streamIn = gzip.open(taggedDocFile, "r")
+            else:
+                streamIn = open(taggedDocFile,"r")
+            "read line by line file"
+            for line in streamIn:
+                "Beginning of document"
+                if line.startswith(".I"):
+                    if firstDoc == 0:
+                        lenOfDocs[docId] = docTokens
+                    docTokens = 0
+                    firstDoc = 0
+                    docId = line[3:]
+                    indexOfDocs[docId] = 0.0
+                    N += 1
+                    continue
+                "empty line (\n etc)"
+                if not line or line == '\n':
+                    continue
+                sent = line.split('\t')
+                word = sent[1+(sent[2]!="<unknown>")] 
+                if useStopWordList == 1 and stopWords.has_key(word):
+                    continue
+                "line containing a token"
+                docTokens +=1
+                if not docStats.has_key(word):
+                    docStats[word] = {}
+                if not docStats[word].has_key(docId):
+                    docStats[word][docId] = 0
+                docStats[word][docId] +=1
+        finally:
+            streamIn.close()
         "for last document keep tokens"
         lenOfDocs[docId] = docTokens
         
