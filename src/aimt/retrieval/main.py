@@ -6,6 +6,7 @@ Created on 31.08.2011
 
 import os
 import sys
+from pickle import PickleError
 
 "bah. BAH."
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../")
@@ -16,6 +17,7 @@ import gzip
 import math
 import operator
 from collections import defaultdict
+import cPickle as pickle 
 
 class DocCollection:
             
@@ -151,8 +153,8 @@ class Bm25Collection(DocCollection):
         
 class Retriever:
     
-    def __init__(self, queryFile, docCollection, qrelFile):
-        self.queries = self.readQueries(queryFile)
+    def __init__(self, queryFile, docCollection, qrelFile, queryCache=None):
+        self.queries = self.readQueries(queryFile, queryCache)
         self.collection = docCollection
         self.qrels = self.readQrels(qrelFile)
         
@@ -201,8 +203,11 @@ class Retriever:
                     qrels[qId].add(docId)
         return qrels
     
-    def readQueries(self, queryFile):
-        queries = []
+    def readQueries(self, queryFile, cacheFile):
+        queries = self.loadQueriesFromCache(cacheFile)
+        if queries:
+            print "Loaded queries from cache" 
+            return queries
         with open(queryFile, "r") as qF:
             lines = [l.strip() for l in qF.readlines()]
             lNumber = 0
@@ -216,8 +221,24 @@ class Retriever:
                     continue
                 else:
                     raise ValueError("Query file has incorrect format (unexpected line: "+str(lNumber)+": "+lines[lNumber]+") - expected .Q or empty") 
-                    
+        self.saveQueriesToCache(cacheFile, queries)
         return queries
+    
+    def loadQueriesFromCache(self, cacheFile):
+        if not cacheFile:   return []
+        try:
+            with open(cacheFile) as f:
+                return pickle.load(f)
+        except EOFError:
+            return []
+        except IOError, PickleError:
+            return []
+        
+    def saveQueriesToCache(self, cacheFile, queries):
+        if not cacheFile:   return
+        with open(cacheFile,"w") as f:
+            pickle.dump(queries, f)
+    
     
 class Query:
     tagger = TreeTaggerIO(ttDir)
@@ -263,6 +284,7 @@ if __name__ == '__main__':
     parser.add_option("--K1",help="K1 param of BM25. Default = 2.0", default=2.0, type="float")
     parser.add_option("--B",help="B param of BM25. Default = .75", default=.75, type="float")
     parser.add_option("--threshold",help="Min value of BM25 score to include document in retrieval set. Default: 3.0", default=3.0, type="float")
+    parser.add_option("--queryCache",help="Completely processed query file will be stored on disk under given path as pickled python object. Subsequent runs will use it from there.", default=None)
     #parser.add_option("-q","--queries",help="Name of a query file (queryId \n Query \n DocId \n context) -- if given, will be used as query input. Otherwise the last positional argument(s) are taken to be queries")
     options, args = parser.parse_args()
     
@@ -275,9 +297,10 @@ if __name__ == '__main__':
     
     collection = Bm25Collection(docFile, B=options.B, K1=options.K1, stopwordFile=options.stopwords, threshold=options.threshold)
     
-    retriever = Retriever(queryFile, collection, options.qrels)
+    retriever = Retriever(queryFile, collection, options.qrels, queryCache=options.queryCache)
     results, prec, recall = retriever.retrieveBatch()
-    print results, prec, recall
+    f = (2*prec * recall) / (prec + recall)
+    print "Results: \t %s \nPrecision, Recall, F1: \t %f %f %f" % (str(results), prec, recall, f)
     
 #    args = sys.argv[1:]
 #    
