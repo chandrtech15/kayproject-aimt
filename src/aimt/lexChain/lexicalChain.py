@@ -345,7 +345,7 @@ class LexNode:
         rellinks = list of LexLinks
         """
         # a word (str)
-        self.wrd = word;
+        self.wrd = word
         # the sense of the word this node represents (int)
         self.sensenum = sensenum;
         # list of lexical chains
@@ -356,6 +356,11 @@ class LexNode:
         return 'LexNode('+str(self.wrd)+','+str(self.sensenum)+')';
     def __repr__(self):
         return self.wrd+'_'+str(self.sensenum);
+    def __hash__(self):
+        return self.sensenum if self.sensenum else self.wrd.__hash__()
+    def __eq__(self, other):
+        if not isinstance(other, LexNode):  return False
+        return other.__hash__() == self.__hash__()
     def word(self):
         """
         Returns the word stored in the LexNode.
@@ -519,6 +524,6 @@ def finalizeLexChains(disambiged):
             if other.sense() != disambiged[other.word()].sense():
                 continue
             alreadyAdded.add(other)
-            lexChain.append(other.word())
+            lexChain.append(other)#.word())
         lexChains.append(lexChain)
     return lexChains 

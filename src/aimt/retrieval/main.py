@@ -298,7 +298,7 @@ if __name__ == '__main__':
     
     retriever = Retriever(queryFile, collection, options.qrels, queryCache=options.queryCache)
     results, prec, recall = retriever.retrieveBatch()
-    f = (2*prec * recall) / (prec + recall)
+    f = 0 if prec == 0 or recall == 0 else (2* prec * recall) / (prec + recall)
     print "Results: \t %s \nPrecision, Recall, F1: \t %f %f %f" % (str(results), prec, recall, f)
     
     retriever.saveQueriesToCache(options.queryCache)

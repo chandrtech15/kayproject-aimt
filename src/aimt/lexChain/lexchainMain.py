@@ -80,6 +80,7 @@ def run(streamIn, streamOut, chainOutFile):
     docCounter = 0
     sentCounter = 0
     
+    chainOutStream = None
     if chainOutFile:
         chainOutStream = open(chainOutFile, "w")
             
@@ -88,26 +89,45 @@ def run(streamIn, streamOut, chainOutFile):
         sentCounter += len(sentences)
         newSentences = [[(_lemmaIfAvailable(w), w[4]) for w in sentence] for sentence in sentences]
         "We assume there is only one paragraph"
-        input += [newSentences]
+        input = [newSentences]
+        
+        senses = lexChainWSD(input, deplural=False, additionalTerms=termDict)
+        
+        chainWordDict = {}
+        for chain in [ch for ch in finalizeLexChains(senses) if len(ch) > 1]:
+            chainsTotal += 1
+            chainKey = tuple(chain)
+            chainId = chainDict[chainKey] = chainDict.get(chainKey, len(chainDict))
+            for word in chain:
+                chainWordDict[word] = chainId
+            if chainOutStream:
+                chainOutStream.write(str(chainId) + "|" + str(chainKey)+"\n")
     
-    
-    senses = lexChainWSD(input, deplural=False, additionalTerms=termDict)
-    
-    chainWordDict = {}
-    for chain in [ch for ch in finalizeLexChains(senses) if len(ch) > 1]:
-        chainsTotal += 1
-        chainKey = tuple(chain)
-        chainId = chainDict[chainKey] = chainDict.get(chainKey, len(chainDict))
-        for word in chain:
-            chainWordDict[word] = chainId
-        if chainOutStream:
-            chainOutStream.write(str(chainId) + "|" + str(chainKey)+"\n")
-    
-    #writeConll(streamOut, sentences, chainWordDict, docId)
+        writeConll(streamOut, sentences, chainWordDict, docId)
         
     if chainOutStream:
         chainOutStream.close()
-                
+        
+    withoutOrder = defaultdict(int)
+    ngrams = defaultdict(int)
+    for ch in chainDict.iterkeys():
+        ngrams[(None, ch[0], ch[1])] += 1
+        for ngram in [(ch[k-2], ch[k-1], ch[k]) for k in xrange(2, len(ch))]:
+            ngrams[ngram] += 1
+        ngrams[(ch[-2], ch[-1], None)] += 1
+        ch = set(ch)
+        ch = sorted(list(ch))
+        withoutOrder[tuple(ch)] += 1        
+        
+    log.info("Bigrams with count > 1:")
+    selection = sorted([(ngram, count) for ngram, count in ngrams.iteritems() if count > 1], key=lambda i: i[1])
+    log.info(str(selection))
+    log.info(len(selection))
+    
+    log.info("Without order with count > 1:")
+    selection = sorted([(ngram, count) for ngram, count in withoutOrder.iteritems() if count > 1], key=lambda i: i[1])
+    log.info(str(selection))
+    
     log.info("Some stats:")
     log.info("  Total chains found:    "+str(chainsTotal))
     log.info("  Unique chains found:    "+str(len(chainDict)))
@@ -119,6 +139,7 @@ if __name__ == '__main__':
     try:
         args = sys.argv[1:]
         chainOutStream = None
+        chainOutFile = None
         if args[0] == "-chainout":
             chainOutFile = args[1]
             args = args[2:]
