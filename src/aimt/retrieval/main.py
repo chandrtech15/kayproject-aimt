@@ -221,7 +221,6 @@ class Retriever:
                     continue
                 else:
                     raise ValueError("Query file has incorrect format (unexpected line: "+str(lNumber)+": "+lines[lNumber]+") - expected .Q or empty") 
-        self.saveQueriesToCache(cacheFile, queries)
         return queries
     
     def loadQueriesFromCache(self, cacheFile):
@@ -234,10 +233,10 @@ class Retriever:
         except IOError, PickleError:
             return []
         
-    def saveQueriesToCache(self, cacheFile, queries):
+    def saveQueriesToCache(self, cacheFile):
         if not cacheFile:   return
         with open(cacheFile,"w") as f:
-            pickle.dump(queries, f)
+            pickle.dump(self.queries, f)
     
     
 class Query:
@@ -256,7 +255,7 @@ class Query:
         return [entry.split("\t") for entry in Query.tagger.tagger.TagText(txt)]
         
     def preprocess(self):
-        if not self.queryTagged:    
+        if not self.queryTagged:
             self.queryTagged = self.tag(self.query) 
         if not self.docTagged:  
             self.docTagged = self.tag(self.doc)
@@ -301,6 +300,8 @@ if __name__ == '__main__':
     results, prec, recall = retriever.retrieveBatch()
     f = (2*prec * recall) / (prec + recall)
     print "Results: \t %s \nPrecision, Recall, F1: \t %f %f %f" % (str(results), prec, recall, f)
+    
+    retriever.saveQueriesToCache(options.queryCache)
     
 #    args = sys.argv[1:]
 #    
