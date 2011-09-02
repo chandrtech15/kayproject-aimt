@@ -4,13 +4,13 @@ install:	corpus/.created ext/.created
 preprocessing: corpus/data/test.tg corpus/data/train.tg corpus/data/dev.tg
 
 corpus/data/test.tg: install
-	python src/preprocessing/treetaggerIO.py ext/tt corpus/data/test corpus/data/test.tg
+	python src/aimt/preprocessing/treetaggerIO.py ext/tt corpus/data/test corpus/data/test.tg
 
 corpus/data/train.tg: install
-	python src/preprocessing/treetaggerIO.py ext/tt corpus/data/train corpus/data/train.tg
+	python src/aimt/preprocessing/treetaggerIO.py ext/tt corpus/data/train corpus/data/train.tg
 
 corpus/data/dev.tg: install
-	python src/preprocessing/treetaggerIO.py ext/tt corpus/data/dev corpus/data/dev.tg
+	python src/aimt/preprocessing/treetaggerIO.py ext/tt corpus/data/dev corpus/data/dev.tg
 
 preprocessingServer:
 	./loadFromServer.sh
