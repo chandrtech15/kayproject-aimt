@@ -79,15 +79,28 @@ def run(streamIn, streamOut, chainOutFile):
     chainsTotal = 0
     docCounter = 0
     sentCounter = 0
+    tokenNgrams = defaultdict(int)
+    tokensTotal = 0
+    avgChainLength = 0
     
     chainOutStream = None
     if chainOutFile:
         chainOutStream = open(chainOutFile, "w")
             
     for docId, sentences in readConll(streamIn):
+        
         docCounter += 1
         sentCounter += len(sentences)
         newSentences = [[(_lemmaIfAvailable(w), w[4]) for w in sentence] for sentence in sentences]
+        
+        for ch in newSentences:
+            ch = [w for w,_ in ch]
+#            tokenNgrams[(None, ch[0], ch[1])] += 1
+#            for ngram in [(ch[k-2], ch[k-1], ch[k]) for k in xrange(2, len(ch))]:
+#                tokenNgrams[ngram] += 1
+#            tokenNgrams[(ch[-2], ch[-1], None)] += 1
+            tokensTotal += len(ch)
+        
         "We assume there is only one paragraph"
         input = [newSentences]
         
@@ -111,29 +124,38 @@ def run(streamIn, streamOut, chainOutFile):
     withoutOrder = defaultdict(int)
     ngrams = defaultdict(int)
     for ch in chainDict.iterkeys():
+        avgChainLength += len(ch)
         ngrams[(None, ch[0], ch[1])] += 1
         for ngram in [(ch[k-2], ch[k-1], ch[k]) for k in xrange(2, len(ch))]:
             ngrams[ngram] += 1
         ngrams[(ch[-2], ch[-1], None)] += 1
         ch = set(ch)
         ch = sorted(list(ch))
-        withoutOrder[tuple(ch)] += 1        
-        
-    log.info("Bigrams with count > 1:")
-    selection = sorted([(ngram, count) for ngram, count in ngrams.iteritems() if count > 1], key=lambda i: i[1])
-    log.info(str(selection))
-    log.info(len(selection))
+        withoutOrder[tuple(ch)] += 1
+    avgChainLength /= float(len(chainDict))        
     
-    log.info("Without order with count > 1:")
-    selection = sorted([(ngram, count) for ngram, count in withoutOrder.iteritems() if count > 1], key=lambda i: i[1])
-    log.info(str(selection))
     
     log.info("Some stats:")
+    log.info("Token N-grams with count > 1:")
+    selection = sorted([(ngram, count) for ngram, count in tokenNgrams.iteritems() if count > 1], key=lambda i: i[1])
+    #log.info(str(selection))
+    log.info(str(len(selection))+" vs. "+str(len(tokenNgrams))+" total")
+        
+    log.info("N-grams with count > 1:")
+    selection = sorted([(ngram, count) for ngram, count in ngrams.iteritems() if count > 1], key=lambda i: i[1])
+    #log.info(str(selection))
+    log.info(str(len(selection))+" vs. "+str(len(ngrams))+" total")
+            
+#    log.info("Without order with count > 1:")
+#    selection = sorted([(ngram, count) for ngram, count in withoutOrder.iteritems() if count > 1], key=lambda i: i[1])
+#    log.info(str(selection))
+    
     log.info("  Total chains found:    "+str(chainsTotal))
     log.info("  Unique chains found:    "+str(len(chainDict)))
     log.info("  Number docs:    "+str(docCounter))
     log.info("  Number sentences:    "+str(sentCounter))
     log.info("  Chains/Doc:    "+str(float(chainsTotal)/docCounter))
+    log.info("  Avg Chain Length:    "+str(avgChainLength))
 
 if __name__ == '__main__':
     try:

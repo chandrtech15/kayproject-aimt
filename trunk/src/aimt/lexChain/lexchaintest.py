@@ -104,22 +104,23 @@ hospital arrival. The authors analyzed 271 cases of ventricular fibrillation man
         input = input.replace("-\n","")
         input = sent_tokenize(input)
         input = [[pos_tag(word_tokenize(sent)) for sent in input]]
-        senses = lexChainWSD(input, deplural=False)
-        return [ch for ch in finalizeLexChains(senses) if len(ch) > 1]
-          
+        disambiged = lexChainWSD(input, deplural=False)
+        return [ch for ch in finalizeLexChains(disambiged) if len(ch) > 1]
+    print run(input)
+    exit()
     totalChains = []
-    with open("../../corpus/ohsu-trec/trec9-train/ohsumed.87","r") as f:
-        next = False
-        counter = 1
-        for line in f:
-            if line.startswith(".W"):
-                next = True
-            elif next:
-                totalChains += run(line.strip())
-                next = False
-                counter += 1
-            if counter > 1:
-                break
+#    with open("../../corpus/ohsu-trec/trec9-train/ohsumed.87","r") as f:
+#        next = False
+#        counter = 1
+#        for line in f:
+#            if line.startswith(".W"):
+#                next = True
+#            elif next:
+#                totalChains += run(line.strip())
+#                next = False
+#                counter += 1
+#            if counter > 1:
+#                break
     
     print len(totalChains)
     totalChains = list(set([tuple(ch) for ch in totalChains]))
