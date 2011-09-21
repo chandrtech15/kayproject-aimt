@@ -68,7 +68,6 @@ class Bm25Collection(DocCollection):
             
         return math.log((self.N-n+0.5)/(n+0.5))
     
-    "stopWordFile: file that has a word in every new line"
     def readIntaggedFile(self, taggedDocFile):
         docStats = {}
         N = 0
