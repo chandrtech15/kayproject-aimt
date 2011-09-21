@@ -103,27 +103,7 @@ class MetaChain:
             self.linkedTo[lnOld].add(lnNew)
             self.linkedTo[lnNew].add(lnOld)
             
-        def createLinksForRelation(lnOld, nodesToExpand, relFun, relWeight):
-            added = set()
-            for node in nodesToExpand:
-                relSenses = relFun(node)
-                for sense in relSenses:
-                    added.add(sense)
-                    if sense.offset in self.chains:
-                        for lnNew in self.chains[sense.offset]:
-                            createLink(lnOld, lnNew, relWeight)
-            return added
-                
-        
-        # add the word to the text position dictionaries
-        self.sentences[word] =  self.sentences.get(word, []) + [sentpos]
-        self.paragraphs[word] =  self.paragraphs.get(word, []) + [parpos]
-        
-        wordList = self.words[word] = self.words.get(word, [])
-        
-        # if the MetaChain has already stored the word, just need to update
-        # distances between word occurances
-        if wordList:
+        def updateWordDist(word):
             # get the nodes for this word
             for ln in self.words[word]:
                 # get the links of the LexNode
@@ -133,67 +113,82 @@ class MetaChain:
                     if sdist < link.sentDist():
                         pdist = parpos - self.paragraphs[ln2.word()][-1]
                         link.setDist(sdist, pdist)
+            
+        # add the word to the text position dictionaries
+        self.sentences[word] =  self.sentences.get(word, []) + [sentpos]
+        self.paragraphs[word] =  self.paragraphs.get(word, []) + [parpos]
+        
+        wordList = self.words[word] = self.words.get(word, [])
+        
+        # if the MetaChain has already stored the word, just need to update
+        # distances between word occurances
+        if wordList:
+            updateWordDist(word)
         # else this is a new word
         else:
-            syns = N.synsets(word, "n")
-            # if it's not in WordNet set the sense to None
-            if not syns:
-                ln = LexNode(word, None)
-                self.chains[word] = [ln]
-                wordList.append(ln)
-                
-                "EDIT by tass: term connections"
-                relTerms = self.additionalTerms.get(word, None)
-                if relTerms:
-                    for term in relTerms:
-                        if term != word and term in self.chains:
-                            sdist = sentpos - self.sentences[term][-1] 
-                            pdist = parpos - self.paragraphs[term][-1] + 1
+            for offset, term, dist in self.expandWord(word):
+                if not offset:
+                    if dist == 0:
+                        ln = LexNode(word, None)
+                        self.chains[word] = [ln]
+                        wordList.append(ln)
+                    else:
+                        if term in self.chains:
+                            assert ln
                             createLink(self.chains[term][0], ln, 2)
                             log.info("Term connection between "+word+" and "+term)
-            else:
-                for syn in syns:
-                    # get the offset
-                    off = syn.offset
-                    # make a LexNode
-                    ln = LexNode(word, off)
-                    wordList.append(ln)
-
+                else:
+                    if dist == 0:
+                        # make a LexNode
+                        ln = LexNode(word, offset)
+                        wordList.append(ln)
+                    assert ln
                     # make links to all the synonyms (things in the synset)
                     # of the word
-                    if off in self.chains:
-                        for lns in self.chains[off]:
+                    if offset in self.chains:
+                        for lns in self.chains[offset]:
                             if lns != ln:
-                                createLink(ln, lns, 0)
+                                createLink(ln, lns, dist)
                     else:
-                        self.chains[off] = [ln]
+                        self.chains[offset] = [ln]
                     
-                    hyperbases = [syn]
-                    hypobases = [syn]
-                    
-                    # make links to everything within our step range/max 
-                    # WordNet distance
-                    for dist in range(1, self.maxdist+1):
-                        dist = min(dist, self.maxdist-1)
-                        hypers = createLinksForRelation(ln, hyperbases, Synset.hypernyms, dist)
-                        hypos = createLinksForRelation(ln, hypobases, Synset.hyponyms, dist)
-                        
-                        # add siblings/uncles/greatuncles to hyponyms
-                        # since once we go sideways we only go down, never back
-                        # up
-                        hypos.update(createLinksForRelation(ln, hypers, Synset.hyponyms, dist))
-                                                
-                        # update bases
-                        hyperbases = hypers
-                        hypobases = hypos
-                        
-                    otherRels = [syn.also_sees, syn.member_meronyms, syn.part_meronyms, syn.substance_meronyms, syn.similar_tos, syn.attributes, syn.member_holonyms, syn.part_holonyms, syn.substance_holonyms]
-                    for rel in otherRels:
-                        relSenses = rel()
-                        for sense in relSenses:
-                            if sense in self.chains:
-                                for lnNew in self.chains[sense]:
-                                    createLink(ln, lnNew, 1)
+    def expandWord(self, word):
+        
+        def expandLst(lst, alreadySeen, word, dist):
+            for el in lst:
+                if el.offset not in alreadySeen:
+                    alreadySeen.add(el.offset)
+                    yield el.offset, word, min(dist, self.maxdist-1)
+        
+        syns = N.synsets(word, "n")
+        if not syns:
+            yield None, word, 0
+            "EDIT by tass: term connections"
+            relTerms = self.additionalTerms.get(word, None)
+            if relTerms:
+                for term in relTerms:
+                    if term != word:
+                        yield None, term, 1
+        else:
+            for syn in syns:
+                yield syn.offset, word, 0
+                alreadySeen = set()
+                alreadySeen.add(syn.offset)
+                
+                hyperBases = [syn]
+                hypoBases = [syn]
+                for dist in range(1, self.maxdist+1):
+                    newHypers = sum([h.hypernyms() for h in hyperBases], [])
+                    newHypos =  sum([h.hyponyms() for h in hypoBases], [])
+                    for el in expandLst(newHypers, alreadySeen, word, dist):
+                        yield el
+                    for el in expandLst(newHypos, alreadySeen, word, dist):
+                        yield el
+                    hyperBases, hypoBases = newHypers, newHypos
+                
+                otherRels = [syn.instance_hypernyms, syn.instance_hyponyms, syn.also_sees, syn.member_meronyms, syn.part_meronyms, syn.substance_meronyms, syn.similar_tos, syn.attributes, syn.member_holonyms, syn.part_holonyms, syn.substance_holonyms]
+                for rel in otherRels:
+                    expandLst(rel(), alreadySeen, word, 1)
     
     def disambigAll(self, default=None):
         """
