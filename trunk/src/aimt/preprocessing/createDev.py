@@ -6,7 +6,7 @@ include = False
 for line in sys.stdin:
 	line = line.strip()
 	if line.startswith(".I "):
-		id = int(line[3:])
-		include = id in devIds
+		getId = int(line[3:])
+		include = getId in devIds
 	if include:	print line		
 

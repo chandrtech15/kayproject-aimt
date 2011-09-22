@@ -38,33 +38,33 @@ class Bm25Collection(DocCollection):
         self.stopWords = {}
         if stopwordFile:
             with open(stopwordFile,"r") as streamIn:
-                for word in streamIn:
-                    self.stopWords[word.strip("\n")] = 0
+                for getWord in streamIn:
+                    self.stopWords[getWord.strip("\n")] = 0
     
     def printDocStats(self):
         print "DOCUMENT STATISTICS"
         print "#####"
-        print "Print word frequencies"
-        for word in self.docStats:
-            print word,"|",
-            for docId in self.docStats[word]:
-                print docId,":",self.docStats[word][docId],", ",
+        print "Print getWord frequencies"
+        for getWord in self.docStats:
+            print getWord,"|",
+            for docId in self.docStats[getWord]:
+                print docId,":",self.docStats[getWord][docId],", ",
             print 
         return
         
                  
-    def Tf(self, word, docId):
-        if not self.docStats.has_key(word):
+    def Tf(self, getWord, docId):
+        if not self.docStats.has_key(getWord):
             return 0
-        if not self.docStats[word].has_key(docId):
+        if not self.docStats[getWord].has_key(docId):
             return 0
-        return self.docStats[word][docId]
+        return self.docStats[getWord][docId]
     
-    def Idf(self, word):
-        if not self.docStats.has_key(word):
+    def Idf(self, getWord):
+        if not self.docStats.has_key(getWord):
             n = 0
         else:
-            n = len(self.docStats[word].keys())
+            n = len(self.docStats[getWord].keys())
             
         return math.log((self.N-n+0.5)/(n+0.5))
     
@@ -99,16 +99,16 @@ class Bm25Collection(DocCollection):
                 if not line:
                     continue
                 sent = line.split('\t')
-                word = sent[1+(sent[2]!="<unknown>")]
-                if self.stopWords.has_key(word):
+                getWord = sent[1+(sent[2]!="<unknown>")]
+                if self.stopWords.has_key(getWord):
                     continue
                 "line containing a token"
                 docTokens +=1
-                if not docStats.has_key(word):
-                    docStats[word] = {}
-                if not docStats[word].has_key(docId):
-                    docStats[word][docId] = 0
-                docStats[word][docId] +=1
+                if not docStats.has_key(getWord):
+                    docStats[getWord] = {}
+                if not docStats[getWord].has_key(docId):
+                    docStats[getWord][docId] = 0
+                docStats[getWord][docId] +=1
         finally:
             streamIn.close()
         "for last document keep tokens"
@@ -118,8 +118,8 @@ class Bm25Collection(DocCollection):
         
     def match(self, query):
         counts = {}
-        for word, _, lemma in query.getTagged():
-            token = lemma if lemma != "<unknown>" else word
+        for getWord, _, lemma in query.getTagged():
+            token = lemma if lemma != "<unknown>" else getWord
             if token in self.stopWords:
                 continue
             counts[token] = counts.get(token, 0) + 1
@@ -144,8 +144,8 @@ class Bm25Collection(DocCollection):
             # B, K1 - free paramters
             return idf * ((tf * (K1 + 1)) / (tf + K1 * (1 - B + B * (fl / avgfl))))
         s = 0;
-        for word in queryTf.keys():
-            s+= ((1.0)*queryTf[word]) * bm25(self.Idf(word),self.Tf(word, docId), self.lenOfDocs[docId], self.avegD, self.B, self.K1)
+        for getWord in queryTf.keys():
+            s+= ((1.0)*queryTf[getWord]) * bm25(self.Idf(getWord),self.Tf(getWord, docId), self.lenOfDocs[docId], self.avegD, self.B, self.K1)
         return s
         
         
@@ -277,7 +277,7 @@ if __name__ == '__main__':
     '''
     
     parser = OptionParser(usage=sys.argv[0]+" [options] <document collection> <file with queries>")
-    parser.add_option("-s","--stopwords",help="Name of a stopword file (one word per line) -- words therein will be filtered out from queries and documents")
+    parser.add_option("-s","--stopwords",help="Name of a stopword file (one getWord per line) -- words therein will be filtered out from queries and documents")
     parser.add_option("--qrels",help="Name of a qrels file (queryId \t docId \t relevance) -- if given, retrieval results will be evaluated. Otherwise the script will only return the docIds")
     parser.add_option("--K1",help="K1 param of BM25. Default = 2.0", default=2.0, type="float")
     parser.add_option("--B",help="B param of BM25. Default = .75", default=.75, type="float")

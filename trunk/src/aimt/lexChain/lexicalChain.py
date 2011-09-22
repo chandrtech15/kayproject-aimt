@@ -1,6 +1,6 @@
 #!/usr/bin/python
 from Queue import Queue
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from nltk.corpus.reader.wordnet import Synset, WordNetCorpusReader
 import logging
 import nltk
@@ -9,7 +9,7 @@ import nltk
 #   Meggie Ladlow <margarel@cs.swarthmore.edu>
 
 """
-A lexical chain based word sense disambiguator based on the linear time 
+A lexical chain based getWord getSense disambiguator based on the linear time 
 algorithm by Galley and McKeown.
 Galley, Michel and McKeown, Kathleen. "Improving Word Sense Disambiguation 
 In Lexical Chaining." INTERNATIONAL JOINT CONFERENCE ON ARTIFICIAL 
@@ -22,14 +22,14 @@ logging.basicConfig()
 log = logging.getLogger("lexchain")
 log.setLevel(logging.DEBUG)
 
-class MetaChain:
+class LexGraph:
     """
-    mc = MetaChain(lexScorer)
+    mc = LexGraph(lexScorer)
 
     Stores representations of all possible lexical chains of the words 
     given to it.
     """
-    def __init__(self, scoring, data=None, additionalTerms={}):
+    def __init__(self, data=None, additionalTerms={}):
         """
         scoring = a LexScoring object
         
@@ -39,14 +39,8 @@ class MetaChain:
         # dict with WordNet offsets or words (strings, edit by tass) as keys and lexical chains (lists) as values
         self.chains = {}
         # dict with strings as keys and lists of LexNodes as values
-        # there is one LexNode per sense of the word
-        self.words = {}
-        # dict of sentence position occurences of a word
-        self.sentences = {}
-        # dict of paragraph position occurences of a word
-        self.paragraphs = {}
-        # LexScoring object that computes link weights between LexNodes
-        self.scoring = scoring
+        # there is one LexNode per getSense of the getWord
+        self.words = defaultdict(set)
         # the maximum wordnet distance with which two words can be linked
         # i.e.: a hyperonym is one step, a sibling is two steps (hypernym ->
         # hyponym)
@@ -88,11 +82,23 @@ class MetaChain:
         for chunk in chunks:
             self.addChunk(chunk)
             
+    def addToChain(self, ln, senseOrToken=None, relWeight=0, type="ident"):
+        senseOrToken = ln.getId() if not senseOrToken else senseOrToken
+        link = LexLink(relWeight, type)
+        try:
+            chain = self.chains[senseOrToken]
+            chain.linkTo(ln, link)
+            log.debug("added "+str(ln)+" to chain")
+        except KeyError:
+            self.chains[senseOrToken] = chain = MetaChain(ln, link)
+            log.debug("NEW chain for "+str(ln)+" and "+str(senseOrToken))
+            
     def addChunk(self, chunk):
         word = " ".join(chunk)
+        "TODO: why's that?"
+        if not word:    return
         if len(chunk) > 1:
             if N.synsets(word, "n") or word in self.additionalTerms:
-                if N.synsets(word, "n"):    log.info("Synsets for "+word)
                 self.addWord(word)
             else:
                 for word in chunk:
@@ -102,74 +108,47 @@ class MetaChain:
             
 
     def addWord(self, word):
-        """
-        Adds a word to the MetaChain by examining WordNet synsets. Creates 
-        links between related words in the MetaChain.
-
-        word = the word to add (a string)
-        """
+        log.debug("Adding "+str(word))
+        wordSet = self.words[word]
         
-        def createLink(lnOld, lnNew, relWeight, type):
-            "There is already a link between the two"
-            if lnOld.word() == lnNew.word() or lnOld.isLinkedTo(lnNew):
-                return
-            
-            sdist =self.sentpos-self.sentences[lnNew.word()][-1]
-            pdist = self.parapos-self.paragraphs[lnNew.word()][-1]
-            log.debug("added LexLink for "+str(lnOld)+" "+str(lnNew))
-            lnOld.linkTo(lnNew, LexLink(relWeight, sdist, pdist, type))
-            
-            chain = self.chains.get(lnOld.id(), [])
-            chain.append(lnNew)
-            lnNew.addChain(chain)
-            
-        def updateWordDist(word):
-            # get the nodes for this word
-            for ln in self.words[word]:
-                # get the links of the LexNode
-                for ln2, link in ln.nodeLinks():
-                    sdist = self.sentpos - self.sentences[ln2.word()][-1]
-                    if sdist < link.sentDist():
-                        pdist = self.parapos - self.paragraphs[ln2.word()][-1]
-                        link.setDist(sdist, pdist)
-            
-        # add the word to the text position dictionaries
-        self.sentences[word] =  self.sentences.get(word, []) + [self.sentpos]
-        self.paragraphs[word] =  self.paragraphs.get(word, []) + [self.parapos]
-        
-        wordList = self.words[word] = self.words.get(word, [])
-        
-        # if the MetaChain has already stored the word, just need to update
-        # distances between word occurances
-        if wordList:
-            updateWordDist(word)
-        # else this is a new word
+        if wordSet:
+            """
+            If only one sense per discourse, each word has to be considered only once
+            (will get only one set of LexNodes).
+            Otherwise, just copy the nodes which are already there and their chain memberships
+            (correct?)
+            Nope -- copy always. We will handle this later, when building the actual chains
+            """
+            newWordSet = set()
+            for ln in wordSet:
+                "This will also copy all chain memberships"
+                lnNew = ln.copy()
+                newWordSet.add(lnNew)
+            self.words[word] = wordSet = newWordSet
         else:
-            for offset, term, dist, type in self.expandWord(word):
-                if not offset:
+            "expandWord assumption: senses / terms of the word as such are discovered first and returned with dist 0"
+            for wnSense, term, dist, type in self.expandWord(word):
+                if not wnSense:
                     if dist == 0:
-                        ln = LexNode(word, None)
-                        self.chains[word] = [ln]
-                        wordList.append(ln)
+                        ln = LexNode(word, None, self.sentpos, self.parapos)
+                        self.addToChain(ln)
+                        wordSet.add(ln)
                     else:
                         if term in self.chains:
                             assert ln
-                            createLink(self.chains[term][0], ln, dist, type)
+                            self.addToChain(ln, term, dist, type)
                             log.info("Term connection between "+word+" and "+term)
                 else:
                     if dist == 0:
                         # make a LexNode
-                        ln = LexNode(word, offset)
-                        wordList.append(ln)
-                    assert ln
-                    # make links to all the synonyms (things in the synset)
-                    # of the word
-                    if offset in self.chains:
-                        for lns in self.chains[offset]:
-                            if lns != ln:
-                                createLink(ln, lns, dist, type)
+                        ln = LexNode(word, wnSense, self.sentpos, self.parapos)
+                        wordSet.add(ln)
+                        self.addToChain(ln)
                     else:
-                        self.chains[offset] = [ln]
+                        assert ln
+                        if wnSense in self.chains:
+                            self.addToChain(ln, wnSense, dist, type) 
+                    
                     
     def expandWord(self, word):
         
@@ -213,65 +192,12 @@ class MetaChain:
                 for rel in otherRels:
                     expandLst(rel(), alreadySeen, word, 1, "unknown")
     
-    def disambigAll(self, default=None):
-        """
-        Returns a dictionary mapping all words in the MetaChain to their best
-        WordNet senses.
-        Deletes redundant links.
-
-        default = the sense of the word if it does not appear in wn 
-        """
-        wsdict = {}
-        for word in self.words:
-            dis = self.disambig(word)
-            wsdict[word] = default if dis == None else dis
-        "Now remove links"
-        for word, lns in self.words.iteritems():
-            for ln in lns:
-                if wsdict[word] != ln:
-                    ln.removeLinks()
-            self.words[word] = [wsdict[word]]
-        return wsdict
-    
-    def disambig(self, word):
-        """
-        Disambiguates a single word by returning the sense with the highest
-        total weights on its edges.
-
-        word = the word to disambiguate (string)
-        """
-        maxscore = -1
-        maxsense = None
-        if not self.words.has_key(word):
-            raise KeyError("%s is not in the MetaChain"%(word))
-        for ln in self.words[word]:
-            score = self.nodeScore(ln)
-            if score > maxscore:
-                maxscore = score
-                maxsense = ln   # changed by tass: we need lexical node to access the links
-        log.debug("Disambiguating "+str(word)+". Has senses: "+str(self.words[word])+". Chosen: "+str(maxsense))
-        return maxsense
-                
-    def nodeScore(self, ln):
-        """
-        Computes the score of a LexNode by summing the weights of its edges.
-
-        ln = a LexNode
-        """
-        score = 0
-        for link in ln.links():
-            sdist = link.sentDist()
-            pdist = link.parDist()
-            wndist = link.wnDist()
-            score += self.scoring.score(wndist, sdist, pdist)
-        return score
-    
-    def finalizeLexChains(self):
+    def buildChains(self):
         lexChains = []
         alreadyAdded = set()
         maxDepth = None
         
-        "first occurrence of word"
+        "first occurrence of getWord"
         for word in self.words:
             ln = self.words[word][0]
             if ln in alreadyAdded:  continue
@@ -287,8 +213,263 @@ class MetaChain:
                 for other in n.adjacentNodes():
                     q.put(other)
                 depth += 1
-            lexChains.append(sorted(lexChain, key=lambda ln: self.sentences[ln.word()][0]))
+            lexChains.append(sorted(lexChain, key=lambda ln: self.sentences[ln.getWord()][0]))
         return lexChains
+
+
+class GalleyMcKeownChainer(LexGraph):
+    def __init__(self, scoring=None, data=None, additionalTerms={}):
+        """
+        scoring = a LexScoring object
+        
+        The maximum wordnet distance used to link two words is equal to the 
+        maximum permissible number of WordNext steps as defined in scoring.
+        """
+        # LexScoring object that computes link weights between LexNodes
+        self.scoring = scoring if scoring else LexScoring([1, 3], [1], [[1, 1, .5, .5], [1, .5, .3, .3]])
+        # the maximum wordnet distance with which two words can be linked
+        # i.e.: a hyperonym is one step, a sibling is two steps (hypernym ->
+        # hyponym)
+        self.maxdist = self.scoring.maxWNDist()
+        
+        LexGraph.__init__(self, data, additionalTerms)
+    
+    def disambigAll(self, default=None):
+        """
+        Returns a dictionary mapping all words in the LexGraph to their best
+        WordNet senses.
+        Deletes redundant links.
+
+        default = the getSense of the getWord if it does not appear in wn 
+        """
+        wsdict = {}
+        for word in self.words:
+            dis = self.disambig(word)
+            wsdict[word] = default if dis == None else dis
+        "Now remove all other LNs from all their lexical chains"
+        for word, lns in self.words.iteritems():
+            for ln in lns:
+                if wsdict[word] != ln:
+                    log.debug("Unlink "+str(ln))
+                    ln.unlinkAll()
+            self.words[word] = [wsdict[word]]
+        return wsdict
+    
+    def disambig(self, word):
+        """
+        Disambiguates a single getWord by returning the getSense with the highest
+        total weights on its edges.
+
+        getWord = the getWord to disambiguate (string)
+        """
+        
+        def updateWordDist(word):
+            # get the nodes for this getWord
+            for ln in self.words[word]:
+                # get the links of the LexNode
+                for ln2, link in ln.nodeLinks():
+                    sdist = self.sentpos - self.sentences[ln2.getWord()][-1]
+                    if sdist < link.sentDist():
+                        pdist = self.parapos - self.paragraphs[ln2.getWord()][-1]
+                        link.setDist(sdist, pdist)
+        
+        maxscore = -1
+        maxsense = None
+        log.debug("Disambiguating "+str(word)+". Has senses: "+str(self.words[word]))
+        for ln in self.words[word]:
+            score = self.nodeScore(ln)
+            if score > maxscore:
+                maxscore, maxsense = score, ln
+        log.debug("    Chosen: "+str(maxsense))
+        return maxsense
+                
+    def nodeScore(self, ln):
+        """
+        Computes the score of a LexNode by summing the weights of its edges.
+
+        ln = a LexNode
+        """
+        score = 0
+        "For each meta chain this node is in:"
+        for chain, link in ln.getMetaChains():
+            "For each LN in that chain"
+            for otherLn, _ in chain.getLexNodes():
+                "i.e. Same word - one word per discourse, so ignore?"
+                "Other possibility: Give points for identity.."
+                if otherLn == ln:    continue
+                sdist, pdist = ln.getDist(otherLn)
+                wndist = link.getWnDist()
+                score += self.scoring.score(wndist, sdist, pdist)
+        return score
+    
+    def buildChains(self):
+        lexChains = []
+        alreadyAdded = set()
+        maxDepth = None
+        
+        "first occurrence of word"
+#        for word in self.words:
+#            ln = self.words[word][0]
+#            if ln in alreadyAdded:  continue
+#            depth = 0
+#            q = Queue()
+#            q.put(ln)
+#            lexChain = []
+#            while not q.empty() and (not maxDepth or depth <= maxDepth):
+#                n = q.get()
+#                if n in alreadyAdded:   continue
+#                alreadyAdded.add(n)
+#                lexChain.append(n)
+#                log.debug(n)
+#                for other, _ in n.get():
+#                    q.put(other)
+#                depth += 1
+#            lexChains.append(sorted(lexChain, key=lambda ln: ln.getPos()[0]))
+        
+        return [[ln for ln, _ in ch.getAdjacentNodes()] for ch in self.chains.itervalues()]
+
+
+class Node:
+    def __init__(self):
+        self.adjacentNodes = {}
+    def linkTo(self, target, link):
+        self._typeCheckNode(target)
+        self._typeCheckLink(link)
+        "What happens when already linked to target? -> ignore, relink"
+        self.adjacentNodes[target] = target.adjacentNodes[self] = link
+    def unlink(self, target):
+        self._typeCheckNode(target)
+        del target.adjacentNodes[self]
+        del self.adjacentNodes[target]
+    def unlinkAll(self):
+        nodesToUnlink = list(self.getAdjacentNodes())
+        for target, _ in nodesToUnlink:
+            self.unlink(target)
+        assert len(self.adjacentNodes) == 0
+    def isLinkedTo(self, target):
+        self._typeCheckNode(target)
+        return target in self.adjacentNodes
+    def getAdjacentNodes(self):
+        """
+        Will return an iterator over (node, link) pairs
+        """
+        return self.adjacentNodes.iteritems()
+    def getId(self):
+        raise NotImplementedError("Please implement in subclass")
+    def _typeCheckNode(self, obj):
+        if not isinstance(obj, Node): raise TypeError 
+    def _typeCheckLink(self, obj):
+        if not isinstance(obj, LexLink): raise TypeError
+
+class MetaChain(Node):
+    def __init__(self, firstNode, firstLink):
+        self.id = firstNode.getId()
+        self.adjacentNodes = OrderedDict()
+        self.linkTo(firstNode, firstLink)
+    def getId(self):
+        return self.id
+    def getLexNodes(self):
+        return self.getAdjacentNodes()
+    def _typeCheckNode(self, obj):
+        if not isinstance(obj, LexNode): raise TypeError
+    
+    def __len__(self):
+        return len(self.lst)
+    def __getitem__(self, k):
+        return self.lst[k]
+    def __iter__(self):
+        return self.lst.__iter__()
+    def __hash__(self):
+        return self.getId().__hash__()
+    def __eq__(self, other):
+        return (False if not isinstance(other, MetaChain) else self.getId() == other.getId())
+    def __str__(self):
+        return "MetaChain with ID "+str(self.getId())
+    def __repr__(self):
+        return self.__str__()
+    
+class LexNode(Node):
+    """
+    ln = LexNode('dog', 0)
+
+    Stores the getWord and a WordNet getSense number for that getWord, the chains in
+    which that getWord appears, and links to related LexNodes.
+    """
+    def __init__(self, word, sensenum, spos=0, ppos=0):
+        Node.__init__(self)
+        
+        self.word = word
+        self.sensenum = sensenum
+        
+        self.spos = spos
+        self.ppos = ppos
+    
+    def _typeCheckNode(self, obj):
+        if not isinstance(obj, MetaChain): raise TypeError
+    
+    
+    def __str__(self):
+        return 'LexNode('+str(self.word)+','+str(self.sensenum)+')'
+    def __repr__(self):
+        return self.word+'_'+str(self.sensenum)
+    def __hash__(self):
+        return (self.sensenum, self.word).__hash__()
+    def __eq__(self, other):
+        if not isinstance(other, LexNode):  return False
+        return other.word == self.word and other.sensenum == self.sensenum
+    def getWord(self):
+        """
+        Returns the word stored in the LexNode.
+        """
+        return self.word
+    def getSense(self):
+        """
+        Returns the wn getSense number stored in the LexNode.
+        """
+        return self.sensenum
+    def getId(self):
+        return self.sensenum if self.sensenum else self.word
+    def copy(self):
+        lnNew = LexNode(self.word, self.sensenum, self.spos, self.ppos)
+        for target, link in self.getAdjacentNodes():
+            lnNew.linkTo(target, link)
+        return lnNew
+    def getMetaChains(self):
+        return self.getAdjacentNodes()
+    def getPos(self):
+        return self.spos, self.ppos
+    def getDist(self, other):
+        return abs(self.spos - other.spos), abs(self.ppos - other.spos)
+
+class LexLink:
+    
+    linkTypes = set(["hyper", "hypo", "sibling", "syn", "ident", "term", "unknown"])
+    
+    """
+    ll = LexLink(lexNode1, lexNode2, wndist, sentdist, paradist)
+
+    Connects two LexNodes. Stores pointers to each LexNode and stores their 
+    text and wn distances.
+    """
+    def __init__(self, wndist=0, type="unknown"):
+        """
+        wndist = the wordnet distance between ln1 and ln2 (int)
+        sdist, pdist = the shortest text distance between the words stored in 
+            ln1 and ln2 (int)
+        """
+        
+        assert type in LexLink.linkTypes
+        
+        # the wn distance
+        self.wndist = wndist
+        self.type = type
+        
+    def getWnDist(self):
+        """
+        Returns the WordNet distance between the LexNodes. The wn distance 
+        never changes, so there is no corresponding set function.
+        """
+        return self.wndist
 
 class LexScoring:
     """
@@ -302,7 +483,7 @@ class LexScoring:
     In effect LexScoring is a matrix with a number of rows equal to
     the maximum persmissible WordNet distance between two words and a
     number of columns equal to the len(sentbins)+len(parbins)+1. The
-    text and WordNet distances for a word are discretized by comparison with
+    text and WordNet distances for a getWord are discretized by comparison with
     the thresholds and uniquely determine an index into the stepscores matrix.
     """
     def __init__(self, sentbins, parbins, stepscores):
@@ -344,7 +525,7 @@ class LexScoring:
 
     def score(self, wndist, sdist, pdist):
         """
-        Computes and returns the score for a word with the given WordNet 
+        Computes and returns the score for a getWord with the given WordNet 
         distance and text distance (sentence and paragraph distance). Of the
         two text distance measure, the sentence distance is used first, and the
         paragraph distance only considered if the sentence distance is larger
@@ -389,175 +570,3 @@ class LexScoring:
         distance is equal to the number of rows in the scoring matrix.
         """
         return len(self.scores)
-
-class LexNode:
-    """
-    ln = LexNode('dog', 0)
-
-    Stores the word and a WordNet sense number for that word, the chains in
-    which that word appears, and links to related LexNodes.
-    """
-    def __init__(self, word, sensenum, chains=None):
-        """
-        word = the word (string)
-        sensenum = the wn sense number (int or None)
-        chains = list of lexical chains, which are each a list of LexNodes
-            (see MetaChain.chains)
-        rellinks = list of LexLinks
-        """
-        # a word (str)
-        self.wrd = word
-        # the sense of the word this node represents (int)
-        self.sensenum = sensenum
-        # list of lexical chains
-        self.lchains = [] if chains==None else chains
-        # list of LexLinks
-        self.rellinks = {}
-    def __str__(self):
-        return 'LexNode('+str(self.wrd)+','+str(self.sensenum)+')'
-    def __repr__(self):
-        return self.wrd+'_'+str(self.sensenum)
-#    def __hash__(self):
-#        return self.sensenum if self.sensenum else self.wrd.__hash__()
-#    def __eq__(self, other):
-#        if not isinstance(other, LexNode):  return False
-#        return other.__hash__() == self.__hash__()
-    def word(self):
-        """
-        Returns the word stored in the LexNode.
-        """
-        return self.wrd
-    def sense(self):
-        """
-        Returns the wn sense number stored in the LexNode.
-        """
-        return self.sensenum
-    def id(self):
-        return self.sensenum if self.sensenum else self.wrd
-    def addChain(self, chain):
-        """
-        Adds a lexical chain to the chains stored in the LexNode.
-
-        chain = the lexical chain to add (a list of LexNodes)
-        """
-        self.lchains.append(chain)
-    def chains(self):
-        """
-        Returns the lexical chains stored in the LexNode.
-        """
-        return self.lchains
-    def linkTo(self, otherLn, lnkData):
-        """
-        Adds a link to the links stored in the LexNode.
-
-        link = the LexLink to add
-        """
-        self.rellinks[otherLn] = lnkData
-        otherLn.rellinks[self] = lnkData
-    def nodeLinks(self):
-        return self.rellinks.iteritems()
-    def links(self):
-        """
-        Returns the LexLinks stored in the LexNode.
-        """
-        return self.rellinks.itervalues()
-    def adjacentNodes(self):
-        return self.rellinks.iterkeys()
-    def isLinkedTo(self, otherLn):
-        return otherLn in self.rellinks
-    def removeLinks(self):
-        for node in self.adjacentNodes():
-            node.rellinks.pop(self)
-        self.rellinks = {}
-
-class LexLink:
-    
-    linkTypes = set(["hyper", "hypo", "sibling", "syn", "ident", "term", "unknown"])
-    
-    """
-    ll = LexLink(lexNode1, lexNode2, wndist, sentdist, paradist)
-
-    Connects two LexNodes. Stores pointers to each LexNode and stores their 
-    text and wn distances.
-    """
-    def __init__(self, wndist, sdist, pdist, type="unknown"):
-        """
-        wndist = the wordnet distance between ln1 and ln2 (int)
-        sdist, pdist = the shortest text distance between the words stored in 
-            ln1 and ln2 (int)
-        """
-        
-        assert type in LexLink.linkTypes
-        
-        # the wn distance
-        self.wndist = wndist
-        # the text distances
-        self.sdist = sdist
-        self.pdist = pdist
-        
-        self.type = type
-    def wnDist(self):
-        """
-        Returns the WordNet distance between the LexNodes. The wn distance 
-        never changes, so there is no corresponding set function.
-        """
-        return self.wndist
-    def sentDist(self):
-        """
-        Returns the sentence distance between the LexNodes.
-        """
-        return self.sdist
-    def parDist(self):
-        """
-        Returns the paragraph distance between the LexNodes.
-        """
-        return self.pdist
-    def setDist(self, sdist, pdist):
-        """
-        Sets the sentence and paragraph distances between the LexNodes.
-
-        sdist = the new sentence distance (int)
-        pdist = the new paragraph distance (int)
-        """
-        self.sdist = sdist
-        self.pdist = pdist
-
-
-def constructMc(taggedText, noWN=None, \
-        scoring = LexScoring([1, 3], [1], [[1, 1, .5, .5], [1, .5, .3, .3]]), \
-        deplural = False, additionalTerms={}):
-    """
-    disambigedWords = constructMc(nltk.corpus.brown.tagged_paras(filename))
-
-    Disambiguates a text. Returns a dictionary of words (represented with 
-    strings) as keys and integer sense numbers as values. For words that do not
-    appear in WordNet, the value stored in the noWN variable will be the sense
-    number.
-
-    taggedText = a part of speech tagged text organized as an iterable
-        object with each element being a paragraph's text. Each of these 
-        paragraphs is an iterable object with sentences as elements. The
-        sentences are in turn represented by iterable objects of lists
-        or tuples of words and their senses (both strings). Take, for example
-        the following sentence:
-
-        [[[('Needless', 'JJ'), ('to', 'TO'), ('say', 'VB'), (',', ','), 
-        ('I', 'PPSS'), ('was', 'BEDZ'), ('furious', 'JJ')]]]
-
-    noWN = the sense number for words that do not appear in WordNet. This value
-        is not limited to ints. Defaults to None.
-
-    scoring = an optional LexScoring object that defines some parameters
-        for the lexical chains. See lexicalChain.LexScoring for more
-        information. A default with empirically determined, reasonable values is
-        provided.
-
-    deplural = an optional argument (False by default) that does some crude
-        noun stemming. If True, then for every word not in WordNet that ends 
-        in 's', if the 's'-less version is in WordNet then use that word
-        as well.
-    """
-    mc = MetaChain(scoring, additionalTerms=additionalTerms)
-    mc.feedDocument(taggedText)
-    return mc
-
