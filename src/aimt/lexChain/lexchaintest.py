@@ -6,7 +6,7 @@ Created on 18.07.2011
 
 @author: tass
 '''
-from lexicalChain import lexChainWSD, finalizeLexChains
+from lexicalChain import constructMc
 from nltk.tag import *
 from nltk.tokenize import *
 
@@ -104,8 +104,9 @@ hospital arrival. The authors analyzed 271 cases of ventricular fibrillation man
         input = input.replace("-\n","")
         input = sent_tokenize(input)
         input = [[pos_tag(word_tokenize(sent)) for sent in input]]
-        disambiged = lexChainWSD(input, deplural=False)
-        return [ch for ch in finalizeLexChains(disambiged) if len(ch) > 1]
+        mc = constructMc(input, deplural=False)
+        mc.disambigAll()
+        return [ch for ch in mc.finalizeLexChains() if len(ch) > 1]
     print run(input)
     exit()
     totalChains = []

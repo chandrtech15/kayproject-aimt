@@ -5,7 +5,7 @@ Created on 18.07.2011
 
 @author: tass
 '''
-from lexicalChain import lexChainWSD, finalizeLexChains
+from lexicalChain import constructMc, finalizeLexChains
 import os
 import sys
 import gzip
@@ -104,7 +104,7 @@ def run(streamIn, streamOut, chainOutFile):
         "We assume there is only one paragraph"
         input = [newSentences]
         
-        senses = lexChainWSD(input, deplural=False, additionalTerms=termDict)
+        senses = constructMc(input, deplural=False, additionalTerms=termDict)
         
         chainWordDict = {}
         for chain in [ch for ch in finalizeLexChains(senses) if len(ch) > 1]:
