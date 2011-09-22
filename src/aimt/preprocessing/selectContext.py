@@ -34,19 +34,19 @@ ids = []
 for line in lines:
 	split = line.strip().split('\t') + [line]
 	rating = int(split[2])
-	id = split[0]
-	if not id in all.keys():
-		ids.append(id)	
-		all[id] = []
-		best[id] = []	
-	all[id].append(split);
+	getId = split[0]
+	if not getId in all.keys():
+		ids.append(getId)	
+		all[getId] = []
+		best[getId] = []	
+	all[getId].append(split);
 	if rating == 1:
-		best[id].append(split)
+		best[getId].append(split)
 selection = []
-for id in ids:
-	opt = all[id]
-	if len(best[id]) > 0:
-		opt = best[id]
+for getId in ids:
+	opt = all[getId]
+	if len(best[getId]) > 0:
+		opt = best[getId]
         choice = rand(len(opt))
 	selection.append(opt[choice][3])
 remainder = [line for line in lines if not line in selection]

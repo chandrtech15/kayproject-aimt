@@ -48,14 +48,14 @@ try:
 
 	docs = {}
 	with open(docFile,'rt') as f:
-		id = None
+		getId = None
 		for line in f.readlines():
 			line = line.strip()
 			if re.match('\\.I', line):
-				id = line[3:]
-			elif id:
-				docs[id] = line
-				id = None
+				getId = line[3:]
+			elif getId:
+				docs[getId] = line
+				getId = None
 			elif len(line) > 0:
 				raise Exception('data file format invalid')
 	

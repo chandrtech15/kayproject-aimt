@@ -5,7 +5,7 @@ Created on 18.07.2011
 
 @author: tass
 '''
-from lexicalChain import constructMc, finalizeLexChains
+from lexicalChain import constructMc, buildChains
 import os
 import sys
 import gzip
@@ -16,8 +16,8 @@ from collections import defaultdict
 log = logging.getLogger("lexchain")
 log.setLevel(logging.INFO)
 
-def _lemmaIfAvailable(word):
-    return word[2] if word[2] != "<unknown>" else word[1]
+def _lemmaIfAvailable(getWord):
+    return getWord[2] if getWord[2] != "<unknown>" else getWord[1]
 
 def loadTerms(termFilename):
     termDict = defaultdict(set)
@@ -64,11 +64,11 @@ def readConll(stream):
 def writeConll(stream, sentences, chainDict, idLine):
     stream.write(idLine+"\n")
     for sent in sentences:
-        for wordnum, word in enumerate(sent):
+        for wordnum, getWord in enumerate(sent):
             if wordnum > 0: 
                 stream.write("\n")
-            word[3] = str(chainDict.get(_lemmaIfAvailable(word), 0))
-            stream.write("\t".join(word))
+            getWord[3] = str(chainDict.get(_lemmaIfAvailable(getWord), 0))
+            stream.write("\t".join(getWord))
         stream.write("\n\n")
 
 def run(streamIn, streamOut, chainOutFile):
@@ -107,12 +107,12 @@ def run(streamIn, streamOut, chainOutFile):
         senses = constructMc(input, deplural=False, additionalTerms=termDict)
         
         chainWordDict = {}
-        for chain in [ch for ch in finalizeLexChains(senses) if len(ch) > 1]:
+        for chain in [ch for ch in buildChains(senses) if len(ch) > 1]:
             chainsTotal += 1
             chainKey = tuple(chain)
             chainId = chainDict[chainKey] = chainDict.get(chainKey, len(chainDict))
-            for word in chain:
-                chainWordDict[word] = chainId
+            for getWord in chain:
+                chainWordDict[getWord] = chainId
             if chainOutStream:
                 chainOutStream.write(str(chainId) + "|" + str(chainKey)+"\n")
     

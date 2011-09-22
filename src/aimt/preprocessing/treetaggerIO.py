@@ -56,16 +56,16 @@ class TreeTaggerIO:
         outF = open(outFile, 'w')
         sep = '\t'
         none = '_'
-        id = 1
+        getId = 1
         
         for entry in ttoutput:
             if entry.startswith(".I"):
                 outF.write("\n")
                 outF.write(entry)
-                id = 1
+                getId = 1
             elif not entry.startswith("<rep"):
                 w, t, l = entry.split()
-                outF.write(str(id) + #id
+                outF.write(str(getId) + #getId
                            sep + w + #word
                            sep + l + #lemma
                            sep + none + #plemma=none
@@ -74,8 +74,8 @@ class TreeTaggerIO:
             
                 if t == 'SENT':
                     outF.write("\n")
-                    id = 1
-                else: id+=1
+                    getId = 1
+                else: getId+=1
             
             
         print "done"    
