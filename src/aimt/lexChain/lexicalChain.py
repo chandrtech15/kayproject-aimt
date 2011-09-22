@@ -50,8 +50,6 @@ class MetaChain:
         # i.e.: a hyperonym is one step, a sibling is two steps (hypernym ->
         # hyponym)
         self.maxdist = self.scoring.maxWNDist()
-        # dict with Lexial Nodes -> Lexical Nodes
-        self.linkedTo = defaultdict(set)
     
         self.additionalTerms = additionalTerms
     
@@ -87,28 +85,25 @@ class MetaChain:
             manner as sentpos (int)
         """
         
-        def createLink(lnOld, lnNew, relWeight):
+        def createLink(lnOld, lnNew, relWeight, type):
             "There is already a link between the two"
-            if lnOld.word() == lnNew.word() or lnNew in self.linkedTo.get(lnOld, set()):
+            if lnOld.word() == lnNew.word() or lnOld.isLinkedTo(lnNew):
                 return
             
             sdist = sentpos-self.sentences[lnNew.word()][-1]
             pdist = parpos-self.paragraphs[lnNew.word()][-1]
             log.debug("added LexLink for "+str(lnOld)+" "+str(lnNew))
-            LexLink(lnOld, lnNew, relWeight, sdist, pdist)
+            lnOld.linkTo(lnNew, LexLink(relWeight, sdist, pdist, type))
             
             chain = self.chains.get(lnOld.id(), [])
             chain.append(lnNew)
             lnNew.addChain(chain)
-            self.linkedTo[lnOld].add(lnNew)
-            self.linkedTo[lnNew].add(lnOld)
             
         def updateWordDist(word):
             # get the nodes for this word
             for ln in self.words[word]:
                 # get the links of the LexNode
-                for link in ln.links():
-                    ln2 = link.partner(ln)
+                for ln2, link in ln.nodeLinks():
                     sdist = sentpos - self.sentences[ln2.word()][-1]
                     if sdist < link.sentDist():
                         pdist = parpos - self.paragraphs[ln2.word()][-1]
@@ -126,7 +121,7 @@ class MetaChain:
             updateWordDist(word)
         # else this is a new word
         else:
-            for offset, term, dist in self.expandWord(word):
+            for offset, term, dist, type in self.expandWord(word):
                 if not offset:
                     if dist == 0:
                         ln = LexNode(word, None)
@@ -135,7 +130,7 @@ class MetaChain:
                     else:
                         if term in self.chains:
                             assert ln
-                            createLink(self.chains[term][0], ln, 2)
+                            createLink(self.chains[term][0], ln, dist, type)
                             log.info("Term connection between "+word+" and "+term)
                 else:
                     if dist == 0:
@@ -148,30 +143,30 @@ class MetaChain:
                     if offset in self.chains:
                         for lns in self.chains[offset]:
                             if lns != ln:
-                                createLink(ln, lns, dist)
+                                createLink(ln, lns, dist, type)
                     else:
                         self.chains[offset] = [ln]
                     
     def expandWord(self, word):
         
-        def expandLst(lst, alreadySeen, word, dist):
+        def expandLst(lst, alreadySeen, word, dist, type):
             for el in lst:
                 if el.offset not in alreadySeen:
                     alreadySeen.add(el.offset)
-                    yield el.offset, word, min(dist, self.maxdist-1)
+                    yield el.offset, word, min(dist, self.maxdist-1), type
         
         syns = N.synsets(word, "n")
         if not syns:
-            yield None, word, 0
+            yield None, word, 0, "ident"
             "EDIT by tass: term connections"
             relTerms = self.additionalTerms.get(word, None)
             if relTerms:
                 for term in relTerms:
                     if term != word:
-                        yield None, term, 1
+                        yield None, term, 1, "term"
         else:
             for syn in syns:
-                yield syn.offset, word, 0
+                yield syn.offset, word, 0, "syn"
                 alreadySeen = set()
                 alreadySeen.add(syn.offset)
                 
@@ -179,16 +174,20 @@ class MetaChain:
                 hypoBases = [syn]
                 for dist in range(1, self.maxdist+1):
                     newHypers = sum([h.hypernyms() for h in hyperBases], [])
-                    newHypos =  sum([h.hyponyms() for h in hypoBases], [])
-                    for el in expandLst(newHypers, alreadySeen, word, dist):
+                    newHypos = sum([h.hyponyms() for h in hypoBases], [])
+                    for el in expandLst(newHypers, alreadySeen, word, dist, "hyper"):
                         yield el
-                    for el in expandLst(newHypos, alreadySeen, word, dist):
+                    for el in expandLst(newHypos, alreadySeen, word, dist, "hypo"):
                         yield el
+                    "Do not consider uncles etc"
+                    if dist == 1:
+                        for el in expandLst(sum([h.hyponyms() for h in newHypers], []), alreadySeen, word, dist, "sibling"):
+                            yield el                    
                     hyperBases, hypoBases = newHypers, newHypos
                 
                 otherRels = [syn.instance_hypernyms, syn.instance_hyponyms, syn.also_sees, syn.member_meronyms, syn.part_meronyms, syn.substance_meronyms, syn.similar_tos, syn.attributes, syn.member_holonyms, syn.part_holonyms, syn.substance_holonyms]
                 for rel in otherRels:
-                    expandLst(rel(), alreadySeen, word, 1)
+                    expandLst(rel(), alreadySeen, word, 1, "unknown")
     
     def disambigAll(self, default=None):
         """
@@ -217,8 +216,11 @@ class MetaChain:
         for ln in self.words[word]:
             score = self.nodeScore(ln)
             if score > maxscore:
+                if maxsense:    maxsense.deleteLinks()
                 maxscore = score
                 maxsense = ln   # changed by tass: we need lexical node to access the links
+            else:
+                ln.deleteLinks()
         log.debug("Disambiguating "+str(word)+". Has senses: "+str(self.words[word])+". Chosen: "+str(maxsense))
         return maxsense
                 
@@ -343,7 +345,7 @@ class LexNode:
     Stores the word and a WordNet sense number for that word, the chains in
     which that word appears, and links to related LexNodes.
     """
-    def __init__(self, word, sensenum, chains=None, rellinks=None):
+    def __init__(self, word, sensenum, chains=None):
         """
         word = the word (string)
         sensenum = the wn sense number (int or None)
@@ -358,7 +360,7 @@ class LexNode:
         # list of lexical chains
         self.lchains = [] if chains==None else chains
         # list of LexLinks
-        self.rellinks = [] if rellinks==None else rellinks
+        self.rellinks = {}
     def __str__(self):
         return 'LexNode('+str(self.wrd)+','+str(self.sensenum)+')'
     def __repr__(self):
@@ -392,52 +394,56 @@ class LexNode:
         Returns the lexical chains stored in the LexNode.
         """
         return self.lchains
-    def addLink(self, link):
+    def linkTo(self, otherLn, lnkData):
         """
         Adds a link to the links stored in the LexNode.
 
         link = the LexLink to add
         """
-        self.rellinks.append(link)
+        self.rellinks[otherLn] = lnkData
+        otherLn.rellinks[self] = lnkData
+    def nodeLinks(self):
+        return self.rellinks.iteritems()
     def links(self):
         """
         Returns the LexLinks stored in the LexNode.
         """
-        return self.rellinks
+        return self.rellinks.itervalues()
+    def adjacentNodes(self):
+        return self.rellinks.iterkeys()
+    def isLinkedTo(self, otherLn):
+        return otherLn in self.rellinks
+    def deleteLinks(self):
+        for node in self.adjacentNodes():
+            node.rellinks.pop(self)
+        self.rellinks = {}
 
 class LexLink:
+    
+    linkTypes = set(["hyper", "hypo", "sibling", "syn", "ident", "term", "unknown"])
+    
     """
     ll = LexLink(lexNode1, lexNode2, wndist, sentdist, paradist)
 
     Connects two LexNodes. Stores pointers to each LexNode and stores their 
     text and wn distances.
     """
-    def __init__(self, ln1, ln2, wndist, sdist, pdist):
+    def __init__(self, wndist, sdist, pdist, type="unknown"):
         """
-        ln1, ln2 = LexNodes to connect
         wndist = the wordnet distance between ln1 and ln2 (int)
         sdist, pdist = the shortest text distance between the words stored in 
             ln1 and ln2 (int)
         """
-        # the two connected LexNodes
-        self.verts = {ln1:ln2, ln2:ln1}
+        
+        assert type in LexLink.linkTypes
+        
         # the wn distance
         self.wndist = wndist
-        # adds the link to the connected LexNodes
-        ln1.addLink(self)
-        ln2.addLink(self)
         # the text distances
         self.sdist = sdist
         self.pdist = pdist
-    def partner(self, ln):
-        """
-        Returns the opposite LexNode.
-
-        ln = one of the two LexNodes in the link
-        """
-        if not self.verts.has_key(ln):
-            raise KeyError("LexLink does not connect given LexNode.")
-        return self.verts[ln]
+        
+        self.type = type
     def wnDist(self):
         """
         Returns the WordNet distance between the LexNodes. The wn distance 
@@ -532,8 +538,7 @@ def finalizeLexChains(disambiged):
         alreadyAdded.add(ln)
         log.debug(word + " " + str(ln))
         lexChain = [ln]
-        for lns in ln.links():
-            other = lns.partner(ln)
+        for other in ln.adjacentNodes():
             if other == ln or other.sense() != disambiged[other.word()].sense():
                 continue
             lexChain.append(other)#.word())
