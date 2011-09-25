@@ -9,7 +9,7 @@ awk -v base=$3 -v fname=$3".1" -v chunkSize=$2 \
 	'	BEGIN {n=0;fname = base"."n;print "Writing to "fname}
 		/^.U$/ {
 			if(text) {print text > fname;}
-			if((n % chunkSize) == 0) {fname = base"."n; print "Writing to "fname}
+			if((n % chunkSize) == 0) {close(fname);fname = base"."n; print "Writing to "fname}
 			text = "";readId = 1;n += 1;next
 		}
 		/^[0-9]/ && readId == 1 {print(".I "$0) > fname;readId=0;next}
@@ -17,4 +17,4 @@ awk -v base=$3 -v fname=$3".1" -v chunkSize=$2 \
 	     T {text=$0;T=0;next}
 	     /^.W$/ {W=1;next}
 	     W {text=text" "$0;W=0;next}
-		END {print text > fname;}' $1
+		END {print text > fname;close(fname);}' $1

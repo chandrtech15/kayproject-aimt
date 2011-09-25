@@ -9,6 +9,7 @@ Created on 18.07.2011
 from lexicalChain import GalleyMcKeownChainer
 from nltk.tag import *
 from nltk.tokenize import *
+from aimt.lexChain.lexicalChain import SilberMcCoyChainer
 
 if __name__ == '__main__':
     input = '''Web pages, news articles, blog postings, and other
@@ -104,8 +105,9 @@ hospital arrival. The authors analyzed 271 cases of ventricular fibrillation man
         input = input.replace("-\n","")
         input = sent_tokenize(input)
         input = [[pos_tag(word_tokenize(sent)) for sent in input]]
-        mc = GalleyMcKeownChainer(data=input)
-        mc.disambigAll()
+#        mc = GalleyMcKeownChainer(data=input)
+#        mc.disambigAll()
+        mc = SilberMcCoyChainer(data=input)
         return [ch for ch in mc.buildChains() if len(ch) > 1]
     print run(input)
     exit()

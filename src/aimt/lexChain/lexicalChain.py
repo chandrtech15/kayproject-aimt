@@ -29,29 +29,27 @@ class LexGraph:
     Stores representations of all possible lexical chains of the words 
     given to it.
     """
-    def __init__(self, data=None, additionalTerms={}):
-        """
-        scoring = a LexScoring object
+    def __init__(self, data=None, additionalTerms={}, wnMaxdist=3):
+        self.reset()
         
-        The maximum wordnet distance used to link two words is equal to the 
-        maximum permissible number of WordNext steps as defined in scoring.
-        """
+        # the maximum wordnet distance with which two words can be linked
+        # i.e.: a hyperonym is one step, a sibling is two steps (hypernym ->
+        # hyponym)
+        self.maxdist = wnMaxdist
+    
+        self.additionalTerms = additionalTerms
+        
+        if data:
+            self.feedDocument(data)
+    
+    def reset(self):
         # dict with WordNet offsets or words (strings, edit by tass) as keys and lexical chains (lists) as values
         self.chains = {}
         # dict with strings as keys and lists of LexNodes as values
         # there is one LexNode per getSense of the getWord
         self.words = defaultdict(set)
-        # the maximum wordnet distance with which two words can be linked
-        # i.e.: a hyperonym is one step, a sibling is two steps (hypernym ->
-        # hyponym)
-        self.maxdist = self.scoring.maxWNDist()
-    
-        self.additionalTerms = additionalTerms
         
         self.sentpos = self.parapos = 0
-        
-        if data:
-            self.feedDocument(data)
     
     def __str__(self):
         """
@@ -61,6 +59,7 @@ class LexGraph:
                 'words: ' + str(self.words)
     
     def feedDocument(self, paragraphs):
+        self.reset()
         for para in paragraphs:
             self.feedParagraph(para)
     
@@ -88,10 +87,9 @@ class LexGraph:
         try:
             chain = self.chains[senseOrToken]
             chain.linkTo(ln, link)
-            log.debug("added "+str(ln)+" to chain")
+            log.debug("added "+str(ln)+" to chain "+str(chain))
         except KeyError:
             self.chains[senseOrToken] = chain = MetaChain(ln, link)
-            log.debug("NEW chain for "+str(ln)+" and "+str(senseOrToken))
             
     def addChunk(self, chunk):
         word = " ".join(chunk)
@@ -150,13 +148,15 @@ class LexGraph:
                             self.addToChain(ln, wnSense, dist, type) 
                     
                     
-    def expandWord(self, word):
+    def expandWord(self, word, maxDist=None):
+        
+        maxDist = maxDist if maxDist else self.maxdist
         
         def expandLst(lst, alreadySeen, word, dist, type):
             for el in lst:
                 if el.offset not in alreadySeen:
                     alreadySeen.add(el.offset)
-                    yield el.offset, word, min(dist, self.maxdist-1), type
+                    yield el.offset, word, dist, type
         
         syns = N.synsets(word, "n")
         if not syns:
@@ -175,7 +175,7 @@ class LexGraph:
                 
                 hyperBases = [syn]
                 hypoBases = [syn]
-                for dist in range(1, self.maxdist+1):
+                for dist in range(1, maxDist):
                     newHypers = sum([h.hypernyms() for h in hyperBases], [])
                     newHypos = sum([h.hyponyms() for h in hypoBases], [])
                     for el in expandLst(newHypers, alreadySeen, word, dist, "hyper"):
@@ -218,7 +218,7 @@ class LexGraph:
 
 
 class GalleyMcKeownChainer(LexGraph):
-    def __init__(self, scoring=None, data=None, additionalTerms={}):
+    def __init__(self, scoring=None, data=None, additionalTerms={}, wnMaxdist=3):
         """
         scoring = a LexScoring object
         
@@ -227,12 +227,8 @@ class GalleyMcKeownChainer(LexGraph):
         """
         # LexScoring object that computes link weights between LexNodes
         self.scoring = scoring if scoring else LexScoring([1, 3], [1], [[1, 1, .5, .5], [1, .5, .3, .3]])
-        # the maximum wordnet distance with which two words can be linked
-        # i.e.: a hyperonym is one step, a sibling is two steps (hypernym ->
-        # hyponym)
-        self.maxdist = self.scoring.maxWNDist()
         
-        LexGraph.__init__(self, data, additionalTerms)
+        LexGraph.__init__(self, data=data, additionalTerms=additionalTerms, wnMaxdist=wnMaxdist)
     
     def disambigAll(self, default=None):
         """
@@ -277,13 +273,13 @@ class GalleyMcKeownChainer(LexGraph):
         maxsense = None
         log.debug("Disambiguating "+str(word)+". Has senses: "+str(self.words[word]))
         for ln in self.words[word]:
-            score = self.nodeScore(ln)
+            score = self.getRelation(ln)
             if score > maxscore:
                 maxscore, maxsense = score, ln
         log.debug("    Chosen: "+str(maxsense))
         return maxsense
                 
-    def nodeScore(self, ln):
+    def getRelation(self, ln):
         """
         Computes the score of a LexNode by summing the weights of its edges.
 
@@ -298,7 +294,7 @@ class GalleyMcKeownChainer(LexGraph):
                 "Other possibility: Give points for identity.."
                 if otherLn == ln:    continue
                 sdist, pdist = ln.getDist(otherLn)
-                wndist = link.getWnDist()
+                wndist = min(link.getWnDist(), self.scoring.maxWNDist()-1)
                 score += self.scoring.score(wndist, sdist, pdist)
         return score
     
@@ -327,7 +323,71 @@ class GalleyMcKeownChainer(LexGraph):
 #            lexChains.append(sorted(lexChain, key=lambda ln: ln.getPos()[0]))
         
         return [[ln for ln, _ in ch.getAdjacentNodes()] for ch in self.chains.itervalues()]
-
+    
+class SilberMcCoyChainer(LexGraph):
+    def __init__(self, data=None, additionalTerms={}):
+        LexGraph.__init__(self, data, additionalTerms, wnMaxdist=30)
+    
+    def getRelation(self, ln, link, otherLn, otherLink):
+        if ln.getWord() == otherLn.getWord():
+            return "ident"
+        elif ln.getSense() == otherLn.getSense():
+            return "syn"
+        elif link.getType() == otherLink.getType() == "sibling":
+            return "sibling"
+        elif link.getType() in ["hyper", "hypo"] or otherLink.getType() in ["hyper","hypo"]:
+            return "hyper"
+        else:
+            "TODO - suitable type"
+            return "sibling"
+        
+    def score(self, rel, sd, pd):
+        if rel == "ident" or rel == "syn":  return 1
+        if rel == "hyper":
+            if sd <= 1: return 1
+            return .5
+        if rel == "sibling":
+            if sd <= 1: return 1
+            if sd <= 3: return .3
+            if pd == 0: return .2
+            return 0
+        return 0
+        
+    def getContribToChain(self, ln, link, chain):
+        "Find closest node in chain"
+        lnPre = None
+        for lnOther, linkOther in chain:
+            if lnOther == ln:
+                break
+            lnPre, linkPre = lnOther, linkOther
+        "Determine scoring factors"
+        if not lnPre:
+            "First node in chain"
+            return self.score("ident", 0, 0)
+        else:
+            sd, pd = ln.getDist(lnPre)
+            return self.score(self.getRelation(ln, link, lnPre, linkPre), sd, pd)
+        
+    def buildChains(self):
+        contrib = {}
+        for lns in self.words.itervalues():
+            for ln in lns:
+                score = 0.0
+                maxScore, maxChain = -1, None
+                for chain, link in ln.getMetaChains():
+                    score = self.getContribToChain(ln, link, chain)
+                    "Handle ties -- prefer lower WN offsets"
+                    if score >= maxScore and (not maxChain or score > maxScore or int(chain.getId()) < int(maxChain.getId())):
+                        maxScore, maxChain = score, chain
+                contrib[ln] = maxScore, maxChain
+        
+        for ln, (_, maxChain) in contrib.iteritems():
+            chains = list(ln.getMetaChains())
+            for chain, _ in chains:
+                if chain != maxChain:
+                    ln.unlink(chain)
+        
+        return [[ln for ln, _ in ch.getAdjacentNodes()] for ch in self.chains.itervalues()]
 
 class Node:
     def __init__(self):
@@ -374,17 +434,17 @@ class MetaChain(Node):
         if not isinstance(obj, LexNode): raise TypeError
     
     def __len__(self):
-        return len(self.lst)
+        return len(self.adjacentNodes)
     def __getitem__(self, k):
-        return self.lst[k]
+        return self.adjacentNodes[k]
     def __iter__(self):
-        return self.lst.__iter__()
+        return self.adjacentNodes.iteritems()
     def __hash__(self):
         return self.getId().__hash__()
     def __eq__(self, other):
         return (False if not isinstance(other, MetaChain) else self.getId() == other.getId())
     def __str__(self):
-        return "MetaChain with ID "+str(self.getId())
+        return "MetaChain with ID "+str(self.getId())+": "+str([node for node, _ in self.getLexNodes()])
     def __repr__(self):
         return self.__str__()
     
@@ -470,7 +530,10 @@ class LexLink:
         never changes, so there is no corresponding set function.
         """
         return self.wndist
-
+    
+    def getType(self):
+        return self.type
+    
 class LexScoring:
     """
     sentbins = [1, 3] # sentence distance thresholds for scores

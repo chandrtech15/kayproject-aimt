@@ -4,25 +4,82 @@ Created on 31.08.2011
 @author: tass
 '''
 
+
+from collections import defaultdict
+from optparse import OptionParser
+from pickle import PickleError
+import cPickle as pickle
+import gzip
+import logging
+import math
+import operator
 import os
 import sys
-from pickle import PickleError
+
+log = logging.getLogger("retrieval")
 
 "bah. BAH."
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))+"/../../")
 
+from aimt.lexChain.lexchainMain import readConll, _lemmaIfAvailable
+from aimt.lexChain.lexicalChain import GalleyMcKeownChainer
 from aimt.preprocessing.treetaggerIO import TreeTaggerIO, ttDir
-from optparse import OptionParser
-import gzip
-import math
-import operator
-from collections import defaultdict
-import cPickle as pickle 
 
 class DocCollection:
             
     def match(self, query):
         raise NotImplementedError("Please implement in subclass")
+    
+    def readStopwords(self, stopwordFile):
+        self.stopWords = {}
+        if stopwordFile:
+            with open(stopwordFile,"r") as streamIn:
+                for getWord in streamIn:
+                    self.stopWords[getWord.strip("\n")] = 0
+    
+class LexChainCollection(DocCollection):
+    '''
+    classdocs
+    '''
+
+    def __init__(self, taggedDocFile, stopwordFile=None, bmThreshold=3.0, lcThreshold=3.0):
+        self.docChains = {}
+        self.chainer = GalleyMcKeownChainer(wnMaxdist=3)
+        self.readStopwords(stopwordFile)
+        with open(taggedDocFile, "r") as stream:
+            for idLine, sentences in readConll(stream):
+                docId = idLine[3:]
+                sentences = [[(_lemmaIfAvailable(w), w[4]) for w in sentence] for sentence in sentences]
+                sentences = [[w for w in sentence if w not in self.stopWords] for sentence in sentences]
+                self.chainer.feedDocument([sentences])
+                self.chainer.disambigAll()
+                #print sentences
+                #print "\n".join([str(ch) for _, ch in self.chainer.chains.iteritems() if len(ch) > 0])
+                self.docChains[docId] = set([chId for chId, ch in self.chainer.chains.iteritems() if len(ch) > 0])
+        self.bm25 = Bm25Collection(taggedDocFile, stopwordFile=stopwordFile, threshold=bmThreshold)
+        self.threshold = lcThreshold
+        
+    def match(self, query):
+        candidateRanking = self.bm25.match(query)
+        
+        docScores = defaultdict(int)
+        for word, tag, lemma in query.docTagged + query.queryTagged:
+            word = lemma if lemma != "<unknown>" else word
+            if tag and tag[0] == "N" and word not in self.stopWords:
+                for wnSense, term, dist, type in self.chainer.expandWord(word):
+                    for docId, bmScore in candidateRanking:
+                        doc = self.docChains[docId]
+                        #docScores[docId] = bmScore
+                        if wnSense in doc or term in doc:
+                            docScores[docId] += 1
+        from numpy import mean, std
+        vals = list(docScores.values())
+        threshold = mean(vals)
+        sd = std(vals)
+        threshold = self.threshold#threshold + 0 * sd
+        #print threshold
+        ranking = sorted([(docId, score) for docId, score in docScores.iteritems() if score > threshold], key=lambda (k,v): v, reverse=True)
+        return ranking
     
 class Bm25Collection(DocCollection):
     def __init__(self, taggedDocFile, B=.75 , K1=2.0, stopwordFile=None, threshold=-1):
@@ -33,13 +90,6 @@ class Bm25Collection(DocCollection):
         self.threshold = threshold
         
         self.docStats, self.N, self.indexOfDocs, self.lenOfDocs, self.avegD = self.readIntaggedFile(taggedDocFile)
-    
-    def readStopwords(self, stopwordFile):
-        self.stopWords = {}
-        if stopwordFile:
-            with open(stopwordFile,"r") as streamIn:
-                for getWord in streamIn:
-                    self.stopWords[getWord.strip("\n")] = 0
     
     def printDocStats(self):
         print "DOCUMENT STATISTICS"
@@ -166,11 +216,13 @@ class Retriever:
         I'd prefer a threshold, implemented in match.
         '''
         matches = self.collection.match(q)
+        matches = [m for m in matches if m[0] != q.dId]
+        
         rel = self.qrels[q.qId]
         
         found = float(sum([1 if m in rel else 0 for m, _ in matches]))
-        precQuery = 0.0 if not rel else found / len(matches)
-        recQuery = 0.0 if not rel else found / len(rel)
+        precQuery = 0.0 if not matches else found / len(matches)
+        recQuery = 0.0 if not matches else found / len(rel)
                         
         return matches, precQuery, recQuery
     
@@ -181,7 +233,7 @@ class Retriever:
         recall = 0.0
         
         for q in self.queries:
-            print "Retrieving query "+q.qId
+            log.info("Retrieving query "+q.qId)
             
             result = self.retrieve(q)
             prec += result[1]
@@ -205,7 +257,7 @@ class Retriever:
     def readQueries(self, queryFile, cacheFile):
         queries = self.loadQueriesFromCache(cacheFile)
         if queries:
-            print "Loaded queries from cache" 
+            log.info("Loaded queries from cache") 
             return queries
         with open(queryFile, "r") as qF:
             lines = [l.strip() for l in qF.readlines()]
@@ -281,8 +333,11 @@ if __name__ == '__main__':
     parser.add_option("--qrels",help="Name of a qrels file (queryId \t docId \t relevance) -- if given, retrieval results will be evaluated. Otherwise the script will only return the docIds")
     parser.add_option("--K1",help="K1 param of BM25. Default = 2.0", default=2.0, type="float")
     parser.add_option("--B",help="B param of BM25. Default = .75", default=.75, type="float")
-    parser.add_option("--threshold",help="Min value of BM25 score to include document in retrieval set. Default: 3.0", default=3.0, type="float")
+    parser.add_option("--bmThreshold",help="Min value of BM25 score to include document in retrieval set. Default: 3.0 for bm25, -16 for lexchain", type="float")
+    parser.add_option("--lcThreshold",help="Min value of LexChain score to include document in retrieval set. Default: 11", default=11.0, type="float")
     parser.add_option("--queryCache",help="Completely processed query file will be stored on disk under given path as pickled python object. Subsequent runs will use it from there.", default=None)
+    parser.add_option("--retrModel",help="Retrieval model to use -- either bm25 (default) or lexchain", default="bm25")
+    parser.add_option("-v","--verbose",help="Verbose output?", default=False, action="store_true")
     #parser.add_option("-q","--queries",help="Name of a query file (queryId \n Query \n DocId \n context) -- if given, will be used as query input. Otherwise the last positional argument(s) are taken to be queries")
     options, args = parser.parse_args()
     
@@ -292,13 +347,33 @@ if __name__ == '__main__':
     except IndexError:
         parser.print_help()
         exit(1)
+        
+    if options.verbose:
+        loglevel = logging.INFO
+    else:
+        loglevel = logging.WARNING
+    logging.getLogger("lexchain").setLevel(loglevel)
+    logging.getLogger("retrieval").setLevel(loglevel)
     
-    collection = Bm25Collection(docFile, B=options.B, K1=options.K1, stopwordFile=options.stopwords, threshold=options.threshold)
+    if options.retrModel == "bm25":
+        collection = Bm25Collection(docFile, B=options.B, K1=options.K1, stopwordFile=options.stopwords, threshold=options.bmThreshold if options.bmThreshold else 3)
+    elif options.retrModel == "lexchain":
+        collection = LexChainCollection(docFile, stopwordFile=options.stopwords, bmThreshold=options.bmThreshold if options.bmThreshold else -16, lcThreshold=options.lcThreshold)
     
     retriever = Retriever(queryFile, collection, options.qrels, queryCache=options.queryCache)
+#    for t in xrange(-1,20):
+#        for b in xrange(-20, 20, 2):
+#            collection.bm25.threshold = b
+#            collection.threshold = t
+#            results, prec, recall = retriever.retrieveBatch()
+#            f = 0 if prec == 0 or recall == 0 else (2* prec * recall) / (prec + recall)
+#            print "%d,%d,%.3f,%.3f,%.3f"%(b,t,prec,recall,f)
+#            #print "Results: Precision, Recall, F1: \t %f %f %f" % (prec, recall, f)
+    
     results, prec, recall = retriever.retrieveBatch()
     f = 0 if prec == 0 or recall == 0 else (2* prec * recall) / (prec + recall)
-    print "Results: \t %s \nPrecision, Recall, F1: \t %f %f %f" % (str(results), prec, recall, f)
+    print "Prec, Recall, F for "+options.retrModel+":"
+    print "%.3f,%.3f,%.3f"%(prec,recall,f)
     
     retriever.saveQueriesToCache(options.queryCache)
     
