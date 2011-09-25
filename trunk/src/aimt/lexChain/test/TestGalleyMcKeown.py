@@ -32,7 +32,10 @@ class TestGalleyMcKeown(unittest.TestCase):
                     senses[ln.getWord()] = ln.getSense()
                 else:
                     self.assertEqual(ln.getSense(), senses[ln.getWord()], "One Sense Per Discourse assumption violated!")
-                    
+    def testExpandWord(self):
+        mc = GalleyMcKeownChainer()
+        for ln in mc.expandWord("patient",3):
+            print ln
 
 
 if __name__ == "__main__":
