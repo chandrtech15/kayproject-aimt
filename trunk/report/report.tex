@@ -44,6 +44,13 @@ Refer to related work here. Describe in detail how each part affects the origina
 
 \subsection{Lexical Chains}
 
+Lexical chains are sequences of content words in a text that are semantically similar to each other. Semantic similarity is determined by lexical-semantic relations such as synonymy, holonymy and hyponymy. Consider the following example: ``The new convertible proves to be a good car. The motor is the strongest in the history of automobile.''
+A lexical chain based on the relations mentioned would comprise ``convertible'', ``car'', ``motor'', and ``automobile''. Lexical chains can be seen as a representation for the lexical cohesion within a text. Our intutition is that, given a query together with a larger context, relevant documents are lexically more cohesive with the query. In a \\
+Our approach (no large part of related work, I think)
+Most approaches to lexical chaining so far used only nouns (which is probably due to the comparatively rich lexical resources capturing semantic relations between nouns), though other parts of speech could be included as well. \\ 
+
+
+
 \subsection{Topic Models}
 
 \subsection{Suffix Trees and Approximate Matching}
@@ -60,6 +67,10 @@ Describes the pipeline, the tools used, the CONLL format
 \subsection{Creation of the Topic Model}
 
 \subsection{Lexical Chain Building}
+
+- Generic graph model of lexical cohesion \\
+- Concrete implementations: Galley/McKeown (focused on WSD), Silber/McCoy \\
+- Can handle: Chunks, additional terms, ..? 
 
 \subsection{Index Creation and Search Process}
 
