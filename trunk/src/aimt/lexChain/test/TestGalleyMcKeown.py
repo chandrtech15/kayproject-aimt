@@ -36,7 +36,7 @@ class TestGalleyMcKeown(unittest.TestCase):
         mc = GalleyMcKeownChainer()
         for ln in mc.expandWord("patient",3):
             print ln
-
+            
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
