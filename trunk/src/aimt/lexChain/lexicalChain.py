@@ -79,10 +79,10 @@ class MetaChain(Node):
     """ Alias for getAdjacentNodes() """
     getLexNodes = Node.getAdjacentNodes
     
-    def getLastInserted(self):
-        """ Returns newest/last LexNode in chain """ 
-        return self.adjacentNodes.items()[-1] if self.adjacentNodes else (None, None)
-    
+    def asList(self):
+        """ Returns list view on items """
+        return self.adjacentNodes.items()
+            
     def _typeCheckNode(self, obj):
         if not isinstance(obj, LexNode): raise TypeError
     
@@ -103,6 +103,7 @@ class MetaChain(Node):
         return self.__str__()
     
 class LexNode(Node):
+    
     """ Representation of a word token, its position in the document and its (supposed) sense.
     
     Will be linked to MetaChains.
@@ -112,8 +113,9 @@ class LexNode(Node):
     @author: Margaret Ladlow
     and their Galley/McKeown implementation for inspiration.
     """
-    def __init__(self, word, sensenum, spos=0, ppos=0):
+    def __init__(self, wordIndex, word, sensenum, spos=0, ppos=0):
         """
+        @param wordIndex: position of the word in the document
         @param word: the word string
         @param sensenum: some sense id
         @param spos: number of the sentence this token is in
@@ -123,6 +125,7 @@ class LexNode(Node):
         
         self.word = word
         self.sensenum = sensenum
+        self.wordIndex = wordIndex
         
         self.spos = spos
         self.ppos = ppos
@@ -135,11 +138,11 @@ class LexNode(Node):
         return 'LexNode('+str(self.word)+','+str(self.sensenum)+')'
     def __repr__(self):
         return self.word+'_'+str(self.sensenum)
-#    def __hash__(self):
-#        return (self.sensenum, self.word).__hash__()
-#    def __eq__(self, other):
-#        if not isinstance(other, LexNode):  return False
-#        return other.word == self.word and other.sensenum == self.sensenum
+    def __hash__(self):
+        return (self.sensenum, self.word, self.wordIndex).__hash__()
+    def __eq__(self, other):
+        if not isinstance(other, LexNode):  return False
+        return other.word == self.word and other.sensenum == self.sensenum and other.wordIndex == self.wordIndex
     def getWord(self):
         """ @return: word string """
         return self.word
@@ -149,12 +152,15 @@ class LexNode(Node):
     def getId(self):
         """ @return: sense ID, int """
         return self.sensenum if self.sensenum else self.word
+    def getWordIndex(self):
+        """ @return: Word index, int """
+        return self.wordIndex
     def copy(self):
         """ Makes a copy of this node and all of its chain memberships. 
         Will insert the copy into each chain this node is a member of.
         
         @return: The new LexNode instance """
-        lnNew = LexNode(self.word, self.sensenum, self.spos, self.ppos)
+        lnNew = LexNode(self.wordIndex, self.word, self.sensenum, self.spos, self.ppos)
         for target, link in self.getAdjacentNodes():
             lnNew.linkTo(target, link)
         return lnNew
@@ -231,10 +237,13 @@ class LexGraph:
         """ @ivar chains: Dict mapping MetaChain IDs onto MetaChain instances """ 
         self.chains = {}
         """ @ivar words: Dict mapping word strings onto sets of LexNode instances -- there should be one LexNode for each word instance and possible sense"""
-        self.words = defaultdict(dict)
+        self.words = defaultdict(set)
         """ @ivar sentpos: Sentence number """
         """ @ivar parapos: Paragraph number """ 
-        self.sentpos = self.parapos = self.wIndex = 0
+        self.sentpos = self.parapos = self.wordpos = 0
+        
+        """ Unknown lemmas: Mapping them onto integer IDs TODO """
+        self.unknownLemmas = {}
     
     def __str__(self):
         return 'chains: ' + str(self.chains) + "\n" + \
@@ -261,7 +270,6 @@ class LexGraph:
                 chunks.append(chunk)
                 chunk = []
         for chunk in chunks:
-            self.wIndex += 1
             self.addChunk(chunk)
             
     def makeLink(self, ln, type, chain=None, lexDist=0):
@@ -270,6 +278,13 @@ class LexGraph:
         (such as additional scoring)
         '''
         return LinkData(lexDist, type)
+    
+    def idForUnknownLemma(self, lemma):
+        id = self.unknownLemmas.get(lemma)
+        if not id:
+            id = len(self.unknownLemmas)
+            self.unknownLemmas[lemma] = id
+        return id 
     
     def addToChain(self, ln, senseOrToken=None, lexDist=0, type=LinkData.Type.IDENT):
         senseOrToken = ln.getId() if not senseOrToken else senseOrToken
@@ -299,15 +314,17 @@ class LexGraph:
             
 
     def addWord(self, word):
-        wIndex = self.wIndex
-        log.debug("Adding "+str(word)+" at "+str(wIndex))
-        self.words[word][wIndex] = wordSet = set()
+        self.wordpos += 1
+        
+        log.debug("Adding "+str(word)+" at "+str(self.wordpos))
+        wordSet = self.words[word]
     
         "expandWord assumption: senses / terms of the word as such are discovered first and returned with dist 0"
         for wnSense, term, dist, type in self.expandWord(word):
             if not wnSense:
+                id = self.idForUnknownLemma(term)
                 if dist == 0:
-                    ln = LexNode(word, None, self.sentpos, self.parapos)
+                    ln = LexNode(self.wordpos, word, None, self.sentpos, self.parapos)
                     self.addToChain(ln)
                     wordSet.add(ln)
                 else:
@@ -317,8 +334,9 @@ class LexGraph:
                         log.info("Term connection between "+word+" and "+term)
             else:
                 if dist == 0:
-                    ln = LexNode(word, wnSense, self.sentpos, self.parapos)
+                    ln = LexNode(self.wordpos, word, wnSense, self.sentpos, self.parapos)
                     wordSet.add(ln)
+                    log.debug(str(wordSet))
                     self.addToChain(ln)
                 else:
                     assert ln
@@ -422,7 +440,7 @@ class GalleyMcKeownChainer(LexGraph):
         "Now remove all other LNs from all their lexical chains"
         for word, lns in self.words.iteritems():
             for ln in lns:
-                if wsdict[word] != ln:
+                if wsdict[word].getSense() != ln.getSense():
                     log.debug("Unlink "+str(ln))
                     ln.unlinkAll()
             self.words[word] = [wsdict[word]]
@@ -430,10 +448,10 @@ class GalleyMcKeownChainer(LexGraph):
     
     def disambig(self, word):
         """
-        Disambiguates a single getWord by returning the getSense with the highest
+        Disambiguates a single word by returning the sense with the highest
         total weights on its edges.
 
-        getWord = the getWord to disambiguate (string)
+        @param word: the word to disambiguate (string)
         """
         maxscore = -1
         maxsense = None
@@ -456,9 +474,8 @@ class GalleyMcKeownChainer(LexGraph):
         for chain, _ in ln.getMetaChains():
             "For each LN in that chain"
             for otherLn, _ in chain.getLexNodes():
-                "i.e. Same word - one word per discourse, so ignore?"
-                "Other possibility: Give points for identity.."
-                if otherLn == ln:    continue
+                "Do not score nodes belonging to the same word token!"
+                if otherLn.getWordIndex() == ln.getWordIndex():    continue
                 sdist, pdist = ln.getDist(otherLn)
                 score += self.score(self.getRelBetweenNodes(ln, otherLn), sdist, pdist)
         return score
@@ -505,11 +522,17 @@ class SilberMcCoyChainer(LexGraph):
         @param lexDist: lexical distance between node and chain
         @return: LinkData instance   
         """
+        lnPre = None
         if chain:
-            lnPre, _ = chain.getLastInserted()
-        else:
-            "First node in chain"
+            "If not -> first node in chain"
+            chainLst = chain.asList()
             lnPre = None
+            for pos in xrange(-1, -len(chainLst)):
+                lnPre, _ = chainLst[pos]
+                if lnPre.getWordIndex() != ln.getWordIndex():
+                    "We have found a predecessor which is not the same occurrence"
+                    break
+            
         lnk = SilberMcCoyChainer.LinkData(lnPre, type)
         return lnk
     
