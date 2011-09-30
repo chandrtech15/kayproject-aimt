@@ -52,6 +52,9 @@ Most approaches to lexical chaining so far used only nouns (which is probably du
 
 
 \subsection{Topic Models}
+Topic modeling provides methods for automatically organizing, understanding, searching, and summarizing large set of collections of documents. Furthermore, they have the ability to discover the hidden themes (topics) that exists in such a collection and express them in terms of statistics. In this probabilistic framework, data are assumed to be observed from a generative probabilistic process that includes hidden variables and more precisely the hidden variables correspond to the thematic structure. In order to identify the topics that describe this collection, we need to infer the hidden structure using posterior inference, and finaly, for every new document we can estimate what is the current assigment of topics that we have learned from teh collection. 
+For the needs of this project, we are using Latent Dirichlet Allocation (LDA), which is a generative algorithm which models every topic as a distribution od words and finally, every document as a mixture of topics. Then, every word of every documnt is drawn from one of these topics. 
+The intutition for incorporating topics in our retrieval model, is that we expect that the topics will guide the query to ``fit'' in a topic. Moreover, we expect that relevant documents will share common topics with the query.
 
 \subsection{Suffix Trees and Approximate Matching}
 
@@ -65,6 +68,10 @@ Describes the pipeline, the tools used, the CONLL format
 \subsubsection{Term Extraction}
 
 \subsection{Creation of the Topic Model}
+
+For creating the topic models, we used the java-based MALLET toolkit. For using mallet with our documents that are in the CoNLL, we had to apply a number of preprocessing steps for transorming the CoNLL format into feature vectors, and then after the estimation of the model, we had to write again the learnt topics back in the CoNLL format. Finally, there is a special preprocessing if we want to force our model assigning the same topics in multi-word terms (e.g iron deficiency).
+
+The functionallity of the topic modeling is dual. First of all, given a set of documents we estimate the model. That is we  learn the parameters $\theta$ and $\phi$. Then, for every query with a context, we run the inference step, and given the learnt model, we assign the topics in the context of the query. 
 
 \subsection{Lexical Chain Building}
 
