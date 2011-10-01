@@ -36,24 +36,18 @@ We explore the effect of two shallow semantic document representations on the pr
 
 \section{Introduction and Motivation}
 
+The problem we want to solve is document retrieval using queries connected to their context.   
+
 Extended abstract plus possible applications -- discuss (very) shortly: why topic models, why lexical chains, why suffix trees, i.e. how might they help. \\
 Also overview.
 
 \section{Methodology}
 
-Refer to related work here. Describe in detail how each part affects the original documents and its role in the overall process. Also motivate decisions wrt models and algorithms (e.g. why do we use LDA (?), why do we use the lexical chain algorithm we use etc.)
-
-\subsection{Document Retrieval and Queries in Context}
-
 \subsection{Lexical Chains}
 
 Lexical chains are sequences of content words in a text that are semantically similar to each other. Semantic similarity is determined by lexical-semantic relations such as synonymy, holonymy and hyponymy. Consider the following example: ``The new convertible proves to be a good car. The motor is the strongest in the history of automobile.''
-A lexical chain based on the relations mentioned would comprise ``convertible'', ``car'', ``motor'', and ``automobile''. Lexical chains can be seen as a representation for the lexical cohesion within a text. Our intutition is that, given a query together with a larger context, relevant documents are lexically more cohesive with the query. In a \\
-Our approach (no large part of related work, I think)
-Most approaches to lexical chaining so far used only nouns (which is probably due to the comparatively rich lexical resources capturing semantic relations between nouns), though other parts of speech could be included as well. \\ 
-
-
-
+A lexical chain based on the relations mentioned would comprise ``convertible'', ``car'', ``motor'', and ``automobile''. Lexical chains can be seen as a representation for the lexical cohesion within a text. Our intutition is that, given a query together with a larger context, relevant documents are lexically more cohesive with the query. If we can continue the lexical chains in the document with terms from the query and especially its context, it indicates cohesion relative to the strength of the relations between the term, the chain and within the chain.
+  
 \subsection{Topic Models}
 Topic modeling provides methods for automatically organizing, understanding, searching, and summarizing large set of collections of documents. Furthermore, they have the ability to discover the hidden themes (topics) that exists in such a collection and express them in terms of statistics. In this probabilistic framework, data are assumed to be observed from a generative probabilistic process that includes hidden variables and more precisely the hidden variables correspond to the thematic structure. In order to identify the topics that describe this collection, we need to infer the hidden structure using posterior inference, and finaly, for every new document we can estimate what is the current assigment of topics that we have learned from teh collection. 
 For the needs of this project, we are using Latent Dirichlet Allocation (LDA), which is a generative algorithm which models every topic as a distribution od words and finally, every document as a mixture of topics. Then, every word of every documnt is drawn from one of these topics. 
@@ -90,7 +84,8 @@ At the second step, the two algorithms diverge. Galley/McKeown impose a strong `
 On the contrary, Silber/McCoy allow for one word to have different senses and generally follow a more ``chain-centric'' approach: Their algorithm determines for each word instance the chain on which its membership has the highest influence, using a similar scoring function as the other algorithm. All lexical nodes of the word instance not belonging to the selected chain are removed. \\
 Below we specify the algorithms in pseudo code. The first part is shared by both, while the second differs. EXPAND-BFS is a simple breadth-first search on the WordNet synset tree, starting from the given synset. SCORE is a step function of semantical relation type and text distance as specified in the corresponding papers. \\
 
-Our implementation is written in Python and based on the Natural Language Toolkit (NLTK, http://www.nltk.org). We especially use its WordNet interface. Also, our algorithms expect a tokenized and POS-tagged text as input, where nouns must be tagged by symbols starting with a ``N''.  Details are given in the Usage section. The implementation emphasizes the generic nature of different lexical chaining algorithms, providing a hopefully useful interface to implement further variations. We plan to release the code under a GPL license by submitting it as a contribution to NLTK.
+Our implementation is written in Python and based on the Natural Language Toolkit (NLTK, http://www.nltk.org). Instead of arrays with one field for every WordNet synset and noun occurring in the document like the original papers, it employs hash maps to store the meta chain nodes. This reduces the memory consumption, but also implies that the whole algorithm is technically O(1) only in the average case. One could change this part of the program easily, though. \\
+We use the NLTK WordNet interface. Our experiments so far indicate that initializing this data structure currently causes a considerable overhead. A more efficient representation might be useful to speed up the process. As input, our algorithms expect a tokenized and POS-tagged text as input, where nouns must be tagged by symbols starting with a ``N''.  Details are given in the Usage section. The implementation emphasizes the generic nature of different lexical chaining algorithms, providing a hopefully useful interface to implement further variations. We plan to release the code under a GPL license by submitting it as a contribution to NLTK.
 
 \begin{algorithm}
 \caption{Lexical linking}
@@ -158,11 +153,11 @@ We also use a well-known modification of the suffix tree construction algorithm 
 \subsubsection{Clustering}
 We follow the Suffix Tree Clustering algorithm of Zamir and Etzioni almost exactly in implementing the clustering algorithm. One aspect that is not described in the paper is the way the base cluster scores are combined to form merged cluster scores, so for the moment we obtain the latter by summing up the former.
  
-\subsection{Index Creation and Search Process}
+%\subsection{Index Creation and Search Process}
 
 \section{Usage}
 
-How to run it
+\paragraph{Lexical Chaining.} 
 
 % \section{Evaluation}
 % 
