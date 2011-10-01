@@ -48,7 +48,8 @@ Our approach is to build a layer on top of the usual vector-based retrieval mode
 \subsection{Lexical Chains}
 
 Lexical chains are sequences of content words in a text that are semantically similar to each other. Semantic similarity is determined by lexical-semantic relations such as synonymy, holonymy and hyponymy. Consider the following example: ``The new convertible proves to be a good car. The motor is the strongest in the history of automobile.''
-A lexical chain based on the relations mentioned would comprise ``convertible'', ``car'', ``motor'', and ``automobile''. Lexical chains can be seen as a representation for the lexical cohesion within a text. Our intutition is that, given a query together with a larger context, relevant documents are lexically more cohesive with the query. If we can continue the lexical chains in the document with terms from the query and especially its context, it indicates cohesion relative to the strength of the relations between the term, the chain and within the chain.
+A lexical chain based on the relations mentioned would comprise ``convertible'', ``car'', ``motor'', and ``automobile''. Lexical chains can be seen as a representation for the lexical cohesion within a text. Our intutition is that, given a query together with a larger context, relevant documents are lexically more cohesive with the query. If we can continue the lexical chains in the document with terms from the query and especially its context, it indicates cohesion relative to the strength of the relations between the term, the chain and within the chain. \\
+The cohesion model is applied to a candidate set of documents retrieved by a standard vector space model (BM25). We rank the candidate documents by the number of query terms that have a lexical-semantic connection to one of the lexical chains in the document. Only documents above a threshold are kept and constitute the final result set. Please note that this is a very simplistic way of incorporating the lexical chains and could (or should) be improved to a more sophisticated one. A natural extension would be to assign scores to the chains. Still, preliminary experiments show a slight improvement in precision when using this retrieval model compared to the vector space model alone.      
   
 \subsection{Topic Models}
 Topic modeling provides methods for automatically organizing, understanding, searching, and summarizing large set of collections of documents. Furthermore, they have the ability to discover the hidden themes (topics) that exists in such a collection and express them in terms of statistics. In this probabilistic framework, data are assumed to be observed from a generative probabilistic process that includes hidden variables and more precisely the hidden variables correspond to the thematic structure. In order to identify the topics that describe this collection, we need to infer the hidden structure using posterior inference, and finaly, for every new document we can estimate what is the current assigment of topics that we have learned from teh collection. 
@@ -67,7 +68,7 @@ We therefore make use of suffix trees in a different fashion -- to retrieve more
 \subsection{Preprocessing}
 
 \subsubsection{Tokenization, POS tagging, Lemmatization}
-These steps were carried out by the TreeTagger \footnote{http://www.ims.uni-stuttgart.de/projekte/corplex/TreeTagger/}. The result is written in a tab-separated format (CONLL format) into files on the disk.
+These steps were carried out by the TreeTagger \footnote{http://www.ims.uni-stuttgart.de/projekte/corplex/TreeTagger/}. The result is written in a tab-separated format (CONLL format) into files on the disk. We used a Python wrapper script to control TreeTagger.
 
 \subsubsection{Term Extraction}
 
@@ -250,8 +251,6 @@ Options:
   -v, --verbose         Verbose output?
 \end{verbatim}
 \noindent
-All retrieval models have to implement 
-Currently, there are two models, BM25 and Lexchain.
 
 % \section{Evaluation}
 % 
