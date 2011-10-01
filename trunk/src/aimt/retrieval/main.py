@@ -328,7 +328,7 @@ if __name__ == '__main__':
             - Lists of relevant document IDs for all queries
     '''
     
-    parser = OptionParser(usage=sys.argv[0]+" [options] <document collection> <file with queries>")
+    parser = OptionParser(add_help_option=True, usage=sys.argv[0]+" [options] <document collection> <file with queries>", description="Tool expecting context queries (file containing queries with ID, context documents with ID) and a corpus of documents as input. The output will be a set of matching documents for each query. In addition, relevance judgements mapping each query onto the documents relevant for this query can be given to evaluate the results with regard to precision, recall, and the combined F score. Current retrieval models are bm25 or lexchain (see below for parameters).")
     parser.add_option("-s","--stopwords",help="Name of a stopword file (one getWord per line) -- words therein will be filtered out from queries and documents")
     parser.add_option("--qrels",help="Name of a qrels file (queryId \t docId \t relevance) -- if given, retrieval results will be evaluated. Otherwise the script will only return the docIds")
     parser.add_option("--K1",help="K1 param of BM25. Default = 2.0", default=2.0, type="float")
@@ -371,9 +371,14 @@ if __name__ == '__main__':
 #            #print "Results: Precision, Recall, F1: \t %f %f %f" % (prec, recall, f)
     
     results, prec, recall = retriever.retrieveBatch()
-    f = 0 if prec == 0 or recall == 0 else (2* prec * recall) / (prec + recall)
-    print "Prec, Recall, F for "+options.retrModel+":"
-    print "%.3f,%.3f,%.3f"%(prec,recall,f)
+    for qId, docs in sorted(results.iteritems(), key=lambda (k,v):k):
+        docs = docs[0]
+        if docs:
+            print "\n".join([str(qId)+"\t"+str(docId)+"\t"+str(score) for docId, score in docs])
+    if options.qrels:
+        f = 0 if prec == 0 or recall == 0 else (2* prec * recall) / (prec + recall)
+        print "Prec, Recall, F for "+options.retrModel+":"
+        print "%.3f,%.3f,%.3f"%(prec,recall,f)
     
     retriever.saveQueriesToCache(options.queryCache)
     
