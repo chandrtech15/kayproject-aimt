@@ -10,6 +10,8 @@
 \usepackage{algorithmic}
 \usepackage{algorithm}
 
+\usepackage{listings}
+
 \newtheorem{example}{Example}
 \newcommand{\term}[1]{\textit{#1}}
 
@@ -159,8 +161,35 @@ We follow the Suffix Tree Clustering algorithm of Zamir and Etzioni almost exact
 \section{Usage}
 \label{sec:usage}
 
-
 \paragraph{Lexical Chaining.} 
+This component provides an API and a CLI. Following is a usage description of the CLI: 
+
+\begin{verbatim} 
+Usage: src/aimt/lexChain/lexchainMain.py [options] <> <file with queries>
+
+This script reads in a CONLL file, searches for lexical chains and prints them
+to stdout. Two LC algorithms are supported currently (see below)
+
+Options:
+  -h, --help            show this help message and exit
+  -a LCALGO, --lcAlgo=LCALGO
+                        LC algorithm to use -- either galley (default) or
+                        silber
+  -v, --verbose         Verbose output?
+\end{verbatim}
+\noindent
+The lexical chain API can be found in src/aimt/lexChain/lexicalChain.py. The two main classes are GalleyMcKeownChainer and SilberMcCoyChainer. Their usage is identical. Input has to be a list of paragraphs, which in turn are lists of sentences, which are lists of tuples (token, POS). The output is a list of lists containing LexNode objects (which in turn specify word, sense number and position).
+
+\lstset{language=Python}
+\begin{lstlisting}
+input = [ [ [ ("man", "N"), ("donkey", "N") ] ] ]
+chainer = GalleyMcKeownChainer(data=input)
+"or, instead of giving the input to the constructor: "
+chainer.feedDocument(input)
+chains = chainer.buildChains()
+\end{lstlisting}
+
+
 
 % \section{Evaluation}
 % 
