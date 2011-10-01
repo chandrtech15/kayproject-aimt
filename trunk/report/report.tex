@@ -59,7 +59,10 @@ Topic modeling provides methods for automatically organizing, understanding, sea
 For the needs of this project, we are using Latent Dirichlet Allocation (LDA), which is a generative algorithm which models every topic as a distribution od words and finally, every document as a mixture of topics. Then, every word of every documnt is drawn from one of these topics. 
 The intutition for incorporating topics in our retrieval model, is that we expect that the topics will guide the query to ``fit'' in a topic. Moreover, we expect that relevant documents will share common topics with the query.
 
-\subsection{Suffix Trees and Approximate Matching}
+\subsection{Suffix Trees and Clustering}
+Though our original intention was to retrieve the documents using suffix trees, it turned out to be impractical with respect to the dataset in question, since the queries are long and not necessarily well-formed, which renders exact search useless. Approximate search could serve as a partial solution, but we feel that the results would still offer a recall too low for the task in question.
+
+We therefore make use of suffix trees in a different fashion -- to retrieve more, rather than less documents -- by implementing a clustering algorithm based on suffix trees and retrieving whole clusters, rather than single documents. This allows us to retrieve documents similar to those containing the query terms and can therefore be seen as a method of query expansion. The clustering algorithm is that by Zamir and Etzioni, as described in ``Web Document Clustering: A Feasibility Demonstration''. Its main advantage over most other clustering algorithms is the ability to consider shared phrases rather than single words, while maintaining linear time complexity, though the latter is achieved by using a beam search-like approximation.
 
 \section{Implementation}
 
