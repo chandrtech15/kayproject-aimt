@@ -179,7 +179,7 @@ We follow the Suffix Tree Clustering algorithm of Zamir and Etzioni almost exact
 \section{Usage}
 \label{sec:usage}
 
-\paragraph{Lexical Chaining.} 
+\subsection{Lexical Chaining} 
 This component provides an API and a CLI. Following is a usage description of the CLI: 
 
 \begin{verbatim} 
@@ -207,7 +207,51 @@ chainer.feedDocument(input)
 chains = chainer.buildChains()
 \end{lstlisting}
 
+\subsection{Retrieval System}
 
+Our retrieval system expects a set of queries (plus context) and a document corpus as input. It employs a specified retrieval model to find the best-matching documents for a query. If given, relevance judgements of the documents are used to evaluate the results with regard to recall and precision. \\   
+Documents can be retrieved using the following CLI: 
+
+\begin{verbatim} 
+Usage: src/aimt/retrieval/main.py [options] <document collection> <file with queries>
+
+Tool expecting context queries (file containing queries with ID, context
+documents with ID) and a corpus of documents as input. The output will be a
+set of matching documents for each query. In addition, relevance judgements
+mapping each query onto the documents relevant for this query can be given to
+evaluate the results with regard to precision, recall, and the combined F
+score. Current retrieval models are bm25 or lexchain (see below for
+parameters).
+
+Options:
+  -h, --help            show this help message and exit
+  -s STOPWORDS, --stopwords=STOPWORDS
+                        Name of a stopword file (one getWord per line) --
+                        words therein will be filtered out from queries and
+                        documents
+  --qrels=QRELS         Name of a qrels file (queryId    docId   relevance) --
+                        if given, retrieval results will be evaluated.
+                        Otherwise the script will only return the docIds
+  --K1=K1               K1 param of BM25. Default = 2.0
+  --B=B                 B param of BM25. Default = .75
+  --bmThreshold=BMTHRESHOLD
+                        Min value of BM25 score to include document in
+                        retrieval set. Default: 3.0 for bm25, -16 for lexchain
+  --lcThreshold=LCTHRESHOLD
+                        Min value of LexChain score to include document in
+                        retrieval set. Default: 11
+  --queryCache=QUERYCACHE
+                        Completely processed query file will be stored on disk
+                        under given path as pickled python object. Subsequent
+                        runs will use it from there.
+  --retrModel=RETRMODEL
+                        Retrieval model to use -- either bm25 (default) or
+                        lexchain
+  -v, --verbose         Verbose output?
+\end{verbatim}
+\noindent
+All retrieval models have to implement 
+Currently, there are two models, BM25 and Lexchain.
 
 % \section{Evaluation}
 % 
