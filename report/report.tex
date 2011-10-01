@@ -55,6 +55,7 @@ Topic modeling provides methods for automatically organizing, understanding, sea
 For the needs of this project, we are using Latent Dirichlet Allocation (LDA), which is a generative algorithm which models every topic as a distribution od words and finally, every document as a mixture of topics. Then, every word of every documnt is drawn from one of these topics. 
 The intutition for incorporating topics in our retrieval model, is that we expect that the topics will guide the query to ``fit'' in a topic. Moreover, we expect that relevant documents will share common topics with the query.
 
+
 \subsection{Suffix Trees and Clustering}
 Though our original intention was to retrieve the documents using suffix trees, it turned out to be impractical with respect to the dataset in question, since the queries are long and not necessarily well-formed, which renders exact search useless. Approximate search could serve as a partial solution, but we feel that the results would still offer a recall too low for the task in question.
 
@@ -74,9 +75,26 @@ These steps were carried out by the TreeTagger \footnote{http://www.ims.uni-stut
 
 \subsection{Creation of the Topic Model}
 
-For creating the topic models, we used the java-based MALLET toolkit. For using mallet with our documents that are in the CoNLL, we had to apply a number of preprocessing steps for transorming the CoNLL format into feature vectors, and then after the estimation of the model, we had to write again the learnt topics back in the CoNLL format. Finally, there is a special preprocessing if we want to force our model assigning the same topics in multi-word terms (e.g iron deficiency).
+\subsubsection{Learning Topics}
+For creating the topic models, we used the java-based MALLET toolkit~\footnote{\url{http://mallet.cs.umass.edu/}}. 
+The LDA implementation in Mallet takes as an input a file containing all documents in plain txt form. However, since the current format of our dataset is in teh CONLL format, we had to apply a preprocessing step in order to converrt in the appropriate form.
+Then, LDA algorithm applies its own preprocessing on the dataset. For doing this, a pipeline of preprocessing steps is build. This pipeline includes the tokenization of the documents as well as the conversion in lowercase of all the tokens.
+A very important step of the preprocessing for topic modeling is the removal of stop words. This is indispensable due to the fact that these words acquire very high conditional probability on different topics thus they can lead astray the final inference of topics of a document. For applying this step, we used mallet's stop-word list after adding the word ``@card''. ``@card'' has replaced all presence of numbers, and thus we have to disregard it.
+The output of the pipeline is then one feature vector for every document containing the words of the document.
+These feature vectors are then passed in the model for the estimation. 
 
-The functionality of the topic modeling is dual. First of all, given a set of documents we estimate the model. That is we  learn the parameters $\theta$ and $\phi$. Then, for every query with a context, we run the inference step, and given the learnt model, we assign the topics in the context of the query. 
+Since LDA will assign words into topics, the number of topics has to be passed as a parameter and so we mush have an intuition of what number of topics to expect. There has been proposed a number of methods where one do not need to specify the  particular number of $K$ (e.g $K=25$), but just a range of topics (e.g $K \in\{5..25\}$). 
+Furthermore, LDA needs as well two other parameters. First of all, the parameter $\alpha$ has to be specified, which is the parameter of the Dirichlet prior on the per-document topic distribution. Secondly, parameter $\beta$ is needed, is the Dirichlet prior on the per-topic word distribution. Intuitively, there priors acted as smoothing parameters and usually they have to been tuned.
+For the purposes of this project, we have created models with 50, 70 and 100 topics. Furthermore, our parameters $\alpha$ and $\beta$ have been both set to 0.01. 
+
+After the estimation of the model, every word in the dataset obtains a topic. This is why we create a new column in the CONLL format that contains the topic of each word. Stop words are assigned to topic -1.
+At this point we have to mention that LDA samples one token at each time. This is somehow problematic since it is possible that words participating in the same term (e.g iron deficiency) might get different topic. For preventing this, we have created a special pre-processing step that, if it gets activate it, it replaces every word participating in a term with the concatenation of the words (e.g iron!@!deficiency).
+
+
+\subsubsection{Infer topics to queries}
+After having created a model based on a set of parameters, for every new document that comes in the collection (in our case we will only have queries and their context), we can assign again topics in every word, based on the learnt model.
+For this reason, we had to modify the LDA code in order to directly assign topics in the words according to the 2 distributions. 
+
 
 \subsection{Lexical Chain Building}
 
