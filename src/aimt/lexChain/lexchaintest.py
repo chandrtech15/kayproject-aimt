@@ -105,8 +105,9 @@ hospital arrival. The authors analyzed 271 cases of ventricular fibrillation man
         input = input.replace("-\n","")
         input = sent_tokenize(input)
         input = [[pos_tag(word_tokenize(sent)) for sent in input]]
-        mc = GalleyMcKeownChainer(data=input)
-        #mc = SilberMcCoyChainer(data=input)
+        print input
+        #mc = GalleyMcKeownChainer(data=input)
+        mc = SilberMcCoyChainer(data=input)
         return [ch for ch in mc.buildChains() if len(ch) > 1]
 #    print run(input)
 #    exit()
