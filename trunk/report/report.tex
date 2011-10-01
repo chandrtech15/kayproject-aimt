@@ -145,6 +145,18 @@ Our implementation is written in Python and based on the Natural Language Toolki
 	\RETURN {MetaChains}
 \end{algorithmic}
 \end{algorithm}
+
+\subsection{Suffix Tree Clustering}
+
+\subsubsection{Suffix Tree Construction}
+We have implemented the suffix tree construction algorithm in Java following Ukkonen, 1995. It appears that most existing implementations are designed to work with individual symbols, rather than words, and are not always easily extensible. We were unable to locate an open source Java implementation of suffix trees suitable for our purposes. 
+
+Java has been chosen as a trade-off between efficiency and portability. Our implementation doesn't use a number of known ways to minimize the memory requirements, since it is intended more for educational purposes than large-scale search. It does, however, maintain a linear-time worst case complexity\footnote{assuming the addition and retrieval of elements in the Java implementation of HashMap take O(1) time} and is capable of building the index for the dataset in question (over 50 thousand documents) in less than a minute.
+
+We also use a well-known modification of the suffix tree construction algorithm to handle multiple documents -- each document ends with a unique end marker and the tree growth is stopped at each such marker.
+
+\subsubsection{Clustering}
+We follow the Suffix Tree Clustering algorithm of Zamir and Etzioni almost exactly in implementing the clustering algorithm. One aspect that is not described in the paper is the way the base cluster scores are combined to form merged cluster scores, so for the moment we obtain the latter by summing up the former.
  
 \subsection{Index Creation and Search Process}
 
