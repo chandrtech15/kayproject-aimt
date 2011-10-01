@@ -1,10 +1,8 @@
 #!/usr/bin/python
-from Queue import Queue
 from collections import defaultdict, OrderedDict
-from nltk.corpus.reader.wordnet import Synset, WordNetCorpusReader
+from nltk.corpus.reader.wordnet import WordNetCorpusReader
 import logging
 import nltk
-from types import NotImplementedType
 
 N = WordNetCorpusReader(nltk.data.find('corpora/wordnet'))
 
