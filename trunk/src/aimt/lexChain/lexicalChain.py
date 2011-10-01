@@ -98,7 +98,7 @@ class MetaChain(Node):
     def __eq__(self, other):
         return (False if not isinstance(other, MetaChain) else self.getId() == other.getId())
     def __str__(self):
-        return "MetaChain with ID "+str(self.getId())+": "+str([node for node, _ in self.getLexNodes()])
+        return str(self.getId())+":"+str([node for node, _ in self.getLexNodes()])+")"
     def __repr__(self):
         return self.__str__()
     
@@ -135,9 +135,9 @@ class LexNode(Node):
     
     
     def __str__(self):
-        return 'LexNode('+str(self.word)+','+str(self.sensenum)+')'
+        return '%s_%s_%d'%(self.word,self.sensenum,self.wordIndex)
     def __repr__(self):
-        return self.word+'_'+str(self.sensenum)
+        return self.__str__()
     def __hash__(self):
         return (self.sensenum, self.word, self.wordIndex).__hash__()
     def __eq__(self, other):
@@ -238,6 +238,7 @@ class LexGraph:
         self.chains = {}
         """ @ivar words: Dict mapping word strings onto sets of LexNode instances -- there should be one LexNode for each word instance and possible sense"""
         self.words = defaultdict(set)
+        self.wordInstances = []
         """ @ivar sentpos: Sentence number """
         """ @ivar parapos: Paragraph number """ 
         self.sentpos = self.parapos = self.wordpos = 0
@@ -317,7 +318,8 @@ class LexGraph:
         self.wordpos += 1
         
         log.debug("Adding "+str(word)+" at "+str(self.wordpos))
-        wordSet = self.words[word]
+        wordSet = set()
+        self.wordInstances.append(wordSet)
     
         "expandWord assumption: senses / terms of the word as such are discovered first and returned with dist 0"
         for wnSense, term, dist, type in self.expandWord(word):
@@ -336,12 +338,13 @@ class LexGraph:
                 if dist == 0:
                     ln = LexNode(self.wordpos, word, wnSense, self.sentpos, self.parapos)
                     wordSet.add(ln)
-                    log.debug(str(wordSet))
                     self.addToChain(ln)
                 else:
                     assert ln
                     if wnSense in self.chains:
-                        self.addToChain(ln, wnSense, dist, type) 
+                        self.addToChain(ln, wnSense, dist, type)
+        
+        self.words[word].update(wordSet)
                     
                     
     def expandWord(self, word, maxDist=None, inclOtherRels=False):
@@ -559,33 +562,37 @@ class SilberMcCoyChainer(LexGraph):
         the resulting chains are the final ones.
         
         @return: list of chains - list of lists of LexNodes"""
-        contrib = {}
-        for wordOccs in self.words.itervalues():
-            for lns in wordOccs.itervalues():
-                for ln in lns:
-                    score = 0.0
-                    maxScore, maxChain = -1, None
-                    for chain, link in ln.getMetaChains():
-                        if link.prevNode:
-                            relType = self.getRelBetweenNodes(ln, link.prevNode)
-                            sd, pd = ln.getDist(link.prevNode)
-                            score = self.score(relType, sd, pd)
-                        else:
-                            score = self.score(LinkData.Type.IDENT, 0, 0)
+        chainScores = defaultdict(float)
+        toUnlink = []
+        for lns in self.wordInstances:
+            score = 0.0
+            maxScore, maxChain, maxLn = -1, None, None
+            for ln in lns:
+                for chain, link in ln.getMetaChains():
+                    if link.prevNode:
+                        relType = self.getRelBetweenNodes(ln, link.prevNode)
+                        sd, pd = ln.getDist(link.prevNode)
+                        score = self.score(relType, sd, pd)
+                    else:
+                        score = self.score(LinkData.Type.IDENT, 0, 0)
+                    if score >= maxScore:
                         "Handle ties -- prefer lower WN offsets"
-                        if score >= maxScore:
-                            if not maxChain or score > maxScore or isinstance(chain.getId(), str) or chain.getId() < maxChain.getId():
-                                maxScore, maxChain = score, chain
-                    contrib[ln] = maxScore, maxChain
+                        if not maxChain or score > maxScore or isinstance(chain.getId(), str) or chain.getId() < maxChain.getId():
+                            if maxChain:
+                                "Old maxChain"
+                                toUnlink.append((maxChain, maxLn))
+                            maxScore, maxChain, maxLn = score, chain, ln
+                        else:
+                            toUnlink.append((chain, ln))
+                    else:
+                        toUnlink.append((chain, ln))
+            log.debug("Picked "+str(maxLn)+" in "+str(maxChain)+" with "+str(maxScore))
+            chainScores[chain] += maxScore
         
-        chainScores = defaultdict(int)
-        for ln, (score, maxChain) in contrib.iteritems():
-            chains = list(ln.getMetaChains())
-            for chain, _ in chains:
-                if chain != maxChain:
-                    ln.unlink(chain)
-            chainScores[maxChain] += score
-        
+        for chain, ln in toUnlink:
+            log.debug("Unlinking "+str(ln)+" from "+str(chain))
+            chain.unlink(ln)
+                
         chainsScored = [ch for ch, _ in sorted(chainScores.iteritems(), key=lambda (k,v): v)] 
         
         return [[ln for ln, _ in ch.getAdjacentNodes()] for ch in chainsScored]

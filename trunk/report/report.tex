@@ -7,6 +7,9 @@
 \usepackage{amsmath}
 \usepackage{amsfonts}
 
+\usepackage{algorithmic}
+\usepackage{algorithm}
+
 \newtheorem{example}{Example}
 \newcommand{\term}[1]{\textit{#1}}
 
@@ -60,44 +63,105 @@ The intutition for incorporating topics in our retrieval model, is that we expec
 
 \section{Implementation}
 
-Describes the pipeline, the tools used, the CONLL format
-
 \subsection{Preprocessing}
 
-\subsubsection{Tokenization, POS tagging, Lemmatization..}
+\subsubsection{Tokenization, POS tagging, Lemmatization}
+These steps were carried out by the TreeTagger \footnote{http://www.ims.uni-stuttgart.de/projekte/corplex/TreeTagger/}. The result is written in a tab-separated format (CONLL format) into files on the disk.
+
 \subsubsection{Term Extraction}
+
+???
 
 \subsection{Creation of the Topic Model}
 
 For creating the topic models, we used the java-based MALLET toolkit. For using mallet with our documents that are in the CoNLL, we had to apply a number of preprocessing steps for transorming the CoNLL format into feature vectors, and then after the estimation of the model, we had to write again the learnt topics back in the CoNLL format. Finally, there is a special preprocessing if we want to force our model assigning the same topics in multi-word terms (e.g iron deficiency).
 
-The functionallity of the topic modeling is dual. First of all, given a set of documents we estimate the model. That is we  learn the parameters $\theta$ and $\phi$. Then, for every query with a context, we run the inference step, and given the learnt model, we assign the topics in the context of the query. 
+The functionality of the topic modeling is dual. First of all, given a set of documents we estimate the model. That is we  learn the parameters $\theta$ and $\phi$. Then, for every query with a context, we run the inference step, and given the learnt model, we assign the topics in the context of the query. 
 
 \subsection{Lexical Chain Building}
 
-- Generic graph model of lexical cohesion \\
-- Concrete implementations: Galley/McKeown (focused on WSD), Silber/McCoy \\
-- Can handle: Chunks, additional terms, ..? 
+We implemented two lexical chaining algorithms, Silber/McCoy (2003) and Galley/McKeown (2003). Both of them are very similar and have linear time and space requirements with regard to document size, but Galley/McKeown imposes stricter word sense disambiguation. \\
+The basic components as well as the first processing step of the algorithms are identical. Word occurrences in a text or their assumed word senses respectively are treated as lexical nodes in a undirected graph. Together with word sense number and the word token, we store the exact position of the node in the text. A different kind of nodes in the graph are so-called meta chains: They are created implicitly for each WordNet sense encountered while processing a text, as well as for all terms not found in WordNet. This means that each lexical node also ``owns'' a meta chain with the corresponding sense. Meta chains retain the sequential order of heir lexical nodes, i.e. the order in which the nodes entered the chain. \\
+The first processing step inserts edges between the lexical nodes created for each word and the meta chains representing senses in the transitive WordNet closure of said nodes. The closure comprises synonyms, hyponyms, hyperonyms and siblings in the sense hierarchy. All edges are tagged with their relation type (e.g. synonymy). At the end of the first step, we are left with lexical nodes representing all possible senses of the nouns in the text, and meta chain nodes associated to certain senses holding ordered sequences of semantically related lexical nodes. Each lexical node is implicitly linked to all other nodes it shares a chain with. Their relation type is either synonymy/identity (if their word or sense number is the same) or given by the type of the edge between of one of the nodes and the chain of the other. If a such edge does not exist, the nodes are not semantically related. These edges could also be created explicitly. However, in our implementation we refrain from this for efficiency reasons. \\
+At the second step, the two algorithms diverge. Galley/McKeown impose a strong ``One sense per discourse'' assumption: It assigns a score to all lexical nodes of a distinct word (not word instance!) and selects the highest-scoring one. This is assumed to be the most likely sense of the word for the whole text. Thus, the algorithm removes all other senses (lexical nodes) of the word from the lexical graph. The score of a lexical node is the summed score of all of its implicit links to other lexical nodes. An edge is scored according to a very simple step function of the relation type and the distance in the text between the two nodes. For details of the scoring function, please refer to the original paper. Apart from the ones representing the dominant senses, all other lexical nodes are removed from the meta chains. The reduced chains are the final output. \\
+On the contrary, Silber/McCoy allow for one word to have different senses and generally follow a more ``chain-centric'' approach: Their algorithm determines for each word instance the chain on which its membership has the highest influence, using a similar scoring function as the other algorithm. All lexical nodes of the word instance not belonging to the selected chain are removed. \\
+Below we specify the algorithms in pseudo code. The first part is shared by both, while the second differs. EXPAND-BFS is a simple breadth-first search on the WordNet synset tree, starting from the given synset. SCORE is a step function of semantical relation type and text distance as specified in the corresponding papers. \\
 
+Our implementation is written in Python and based on the Natural Language Toolkit (NLTK, http://www.nltk.org). We especially use its WordNet interface. Also, our algorithms expect a tokenized and POS-tagged text as input, where nouns must be tagged by symbols starting with a ``N''.  Details are given in the Usage section. The implementation emphasizes the generic nature of different lexical chaining algorithms, providing a hopefully useful interface to implement further variations. We plan to release the code under a GPL license by submitting it as a contribution to NLTK.
+
+\begin{algorithm}
+\caption{Lexical linking}
+\begin{algorithmic}
+	\STATE $MetaChains \gets$ Dictionary(Identifier to Lists)
+	\FORALL {chunks $w$ in text}
+		\STATE $position$ $\gets$ current word, sentence, paragraph index in text
+		\IF {lemma $w$ $\in$ WordNet}
+			\FORALL {synsets $s$, $w \in s$}
+				\STATE $ln$ $\gets$ LexicalNode($s$, $w$, $position$)
+				\FORALL {sense $s'$, relation $r$ in EXPAND-BFS(s)}
+					\STATE Create edge between $ln$ and $MetaChains[s']$, tag it with $r$
+				\ENDFOR
+			\ENDFOR
+		\ELSE
+			\STATE Create edge between $ln$ and $MetaChains[w]$
+		\ENDIF
+	\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+\begin{algorithm}
+\caption{Chain creation according to Silber/McCoy 2003}
+\begin{algorithmic}
+	\FORALL {chunk w in text}
+		\FORALL {lexical nodes $ln$ associated with $w$}
+			\FORALL {chains $c$, $ln \in c$}
+				\STATE find predecessor node $lnp$ of $ln$ in $c$
+				\STATE $s \gets $ SCORE($ln$, $lnp$)
+				\STATE set $cm$ to $c$ for which $s$ is maximal
+			\ENDFOR
+		\ENDFOR
+		\STATE remove $ln$ from all chains $\neq cm$
+	\ENDFOR
+	\RETURN {MetaChains}
+\end{algorithmic}
+\end{algorithm}
+\begin{algorithm}
+\begin{algorithmic}
+\caption{Chain creation according to Galley/McKeown 2003}
+	\FORALL {distinct chunks $w$}
+		\FORALL {lexical nodes $ln$ associated with $w$}
+			\STATE $score \gets 0$
+			\FORALL {chains $c$, $ln \in c$} 
+				\FORALL {$lno \in c, lno \neq ln$}
+					\STATE $score \gets score$ + SCORE($ln$, $lno$)
+				\ENDFOR
+			\ENDFOR
+			\STATE set $lnm$ to $ln$ for which $score$ is maximal 
+		\ENDFOR
+		\STATE remove all nodes representing different senses of $w$ than $lnm$ from all chains
+	\ENDFOR 
+	\RETURN {MetaChains}
+\end{algorithmic}
+\end{algorithm}
+ 
 \subsection{Index Creation and Search Process}
 
 \section{Usage}
 
 How to run it
 
-\section{Evaluation}
-
-\subsection{Setup}
-
-Data set, evaluation measures, which steps carried out on which part of the data set
-
-\subsection{Results}
-
-Lots of graphs and tables plus some describing text
-
-\subsection{Analysis}
-
-Why do the graphs look the way they look
+% \section{Evaluation}
+% 
+% \subsection{Setup}
+% 
+% Data set, evaluation measures, which steps carried out on which part of the data set
+% 
+% \subsection{Results}
+% 
+% Lots of graphs and tables plus some describing text
+% 
+% \subsection{Analysis}
+% 
+% Why do the graphs look the way they look
 
 \section{Conclusion}
 
