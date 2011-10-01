@@ -5,15 +5,15 @@ Created on 18.07.2011
 
 @author: tass
 '''
+from collections import defaultdict
+from optparse import OptionParser
+import gzip
+import logging
 import os
 import sys
-import gzip
-
-import logging
-from collections import defaultdict
+from lexicalChain import GalleyMcKeownChainer
 
 log = logging.getLogger("lexchain")
-log.setLevel(logging.INFO)
 
 def _lemmaIfAvailable(word):
     return word[2] if word[2] != "<unknown>" else word[1]
@@ -70,7 +70,7 @@ def writeConll(stream, sentences, chainDict, idLine):
             stream.write("\t".join(word))
         stream.write("\n\n")
 
-def run(streamIn, streamOut, chainOutFile):
+def run(algo, streamIn, streamOut):
     termDict = loadTerms("corpus/mesh-terms")
     chainDict = {}
     input = []
@@ -79,47 +79,23 @@ def run(streamIn, streamOut, chainOutFile):
     docCounter = 0
     sentCounter = 0
     tokenNgrams = defaultdict(int)
-    tokensTotal = 0
     avgChainLength = 0
     
-    chainOutStream = None
-    if chainOutFile:
-        chainOutStream = open(chainOutFile, "w")
-            
     for docId, sentences in readConll(streamIn):
         
         docCounter += 1
         sentCounter += len(sentences)
         newSentences = [[(_lemmaIfAvailable(w), w[4]) for w in sentence] for sentence in sentences]
         
-        for ch in newSentences:
-            ch = [w for w,_ in ch]
-#            tokenNgrams[(None, ch[0], ch[1])] += 1
-#            for ngram in [(ch[k-2], ch[k-1], ch[k]) for k in xrange(2, len(ch))]:
-#                tokenNgrams[ngram] += 1
-#            tokenNgrams[(ch[-2], ch[-1], None)] += 1
-            tokensTotal += len(ch)
-        
         "We assume there is only one paragraph"
         input = [newSentences]
         
-        senses = constructMc(input, deplural=False, additionalTerms=termDict)
+        lcAlgo = GalleyMcKeownChainer(additionalTerms=termDict)
+        lcAlgo.feedDocument(input)
         
-        chainWordDict = {}
-        for chain in [ch for ch in buildChains(senses) if len(ch) > 1]:
-            chainsTotal += 1
-            chainKey = tuple(chain)
-            chainId = chainDict[chainKey] = chainDict.get(chainKey, len(chainDict))
-            for word in chain:
-                chainWordDict[word] = chainId
-            if chainOutStream:
-                chainOutStream.write(str(chainId) + "|" + str(chainKey)+"\n")
+        for chain in [ch for ch in lcAlgo.buildChains() if len(ch) > 1]:
+            streamOut.write(str(chain)+"\n")
     
-        writeConll(streamOut, sentences, chainWordDict, docId)
-        
-    if chainOutStream:
-        chainOutStream.close()
-        
     withoutOrder = defaultdict(int)
     ngrams = defaultdict(int)
     for ch in chainDict.iterkeys():
@@ -157,37 +133,28 @@ def run(streamIn, streamOut, chainOutFile):
     log.info("  Avg Chain Length:    "+str(avgChainLength))
 
 if __name__ == '__main__':
+    
+    parser = OptionParser(usage=sys.argv[0]+" [options] <> <file with queries>", description="This script reads in a CONLL file, searches for lexical chains and prints them to stdout. Two LC algorithms are supported currently (see below)")
+    parser.add_option("-a", "--lcAlgo",help="LC algorithm to use -- either galley (default) or silber", default="galley")
+    parser.add_option("-v","--verbose",help="Verbose output?", default=False, action="store_true")
+    #parser.add_option("-q","--queries",help="Name of a query file (queryId \n Query \n DocId \n context) -- if given, will be used as query input. Otherwise the last positional argument(s) are taken to be queries")
+    options, args = parser.parse_args()
+    
+    if options.verbose:
+        log.setLevel(logging.INFO)
+    else:
+        log.setLevel(logging.WARNING)
+    
     try:
-        args = sys.argv[1:]
-        chainOutStream = None
-        chainOutFile = None
-        if args[0] == "-chainout":
-            chainOutFile = args[1]
-            args = args[2:]
-        if len(args) > 0 and len(args) < 3:
-            sameFile = False
-            "Input file"
-            if args[0].endswith(".gz"):
-                streamIn = gzip.open(args[0], "r")
-            else:
-                streamIn = open(args[0],"r")
-            if len(args) == 2:
-                if args[1] == args[0]:
-                    args[1] += ".tmp"
-                    sameFile = True
-                if args[1].endswith(".gz"):
-                    streamOut = gzip.open(args[1],"w")
-                else:
-                    streamOut = open(args[1],"w")
-            else:
-                streamOut = sys.stdout
-            run(streamIn, streamOut, chainOutFile)
-            streamIn.close()
-            streamOut.close()
-            if sameFile:
-                os.rename(args[1], args[0])
+        "Input file"
+        if args[0].endswith(".gz"):
+            streamIn = gzip.open(args[0], "r")
         else:
-            raise IndexError
+            streamIn = open(args[0],"r")
+        streamOut = sys.stdout
+        run(options.lcAlgo, streamIn, streamOut)
+        streamIn.close()
+        streamOut.close()
     except IndexError:
-        print "Usage: lexchainMain.py [-chainout <file>] conllfile [outputfile]"
+        parser.print_help()
         exit(1)
