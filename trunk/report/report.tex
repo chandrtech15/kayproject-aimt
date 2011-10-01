@@ -36,12 +36,12 @@ We explore the effect of two shallow semantic document representations on the pr
 
 \section{Introduction and Motivation}
 
-The problem we want to solve is document retrieval using queries connected to their context.   
+The problem we want to solve is document retrieval using queries connected to their context. As input, we assume a sequence of query terms together with a longer text span constituting the context. The exact nature of context might differ. Possible applications include a ``highlighted search'' from a document, where a user marks a text span as query, and the adjacent parts of the document serve as context. Another application is filtering as proposed in the TREC filtering track: Given an initial query as information need of the user, find relevant documents. The user will tag found documents either as relevant or not relevant, and the judgement is directly made available to the retrieval system. It incorporates relevant document into its search profile to improve its relevance classifier. Here, we have a constantly growing search profile as context. \\       
 
-Extended abstract plus possible applications -- discuss (very) shortly: why topic models, why lexical chains, why suffix trees, i.e. how might they help. \\
-Also overview.
+Our approach is to build a layer on top of the usual vector-based retrieval model which can find shallow semantic relationships between documents. By doing so, we hope to pick the more relevant documents out of the initial set of superficially related (i.e. only by common terms) ones and thus improve the precision of the retrieval system. In particular, we experiment with two methods: Lexical chaining and suffix tree clustering, enriched by topic models. They are described in section \ref{sec:methodology}. To further improve the recall of our lexical chaining algorithms, we first identify important multi-word terms in our corpus of document. This is part of the preprocessing pipeline. We give an overview of the concrete implementation in section \ref{sec:implementation}. Section \ref{sec:usage} gives hints on how to run the components of our system. Finally, we draw a conclusion (Section \ref{sec:conclusion}).    
 
 \section{Methodology}
+\label{sec:methodology}
 
 \subsection{Lexical Chains}
 
@@ -59,6 +59,7 @@ Though our original intention was to retrieve the documents using suffix trees, 
 We therefore make use of suffix trees in a different fashion -- to retrieve more, rather than less documents -- by implementing a clustering algorithm based on suffix trees and retrieving whole clusters, rather than single documents. This allows us to retrieve documents similar to those containing the query terms and can therefore be seen as a method of query expansion. The clustering algorithm is that by Zamir and Etzioni, as described in ``Web Document Clustering: A Feasibility Demonstration''. Its main advantage over most other clustering algorithms is the ability to consider shared phrases rather than single words, while maintaining linear time complexity, though the latter is achieved by using a beam search-like approximation.
 
 \section{Implementation}
+\label{sec:implementation}
 
 \subsection{Preprocessing}
 
@@ -156,6 +157,8 @@ We follow the Suffix Tree Clustering algorithm of Zamir and Etzioni almost exact
 %\subsection{Index Creation and Search Process}
 
 \section{Usage}
+\label{sec:usage}
+
 
 \paragraph{Lexical Chaining.} 
 
@@ -174,7 +177,19 @@ We follow the Suffix Tree Clustering algorithm of Zamir and Etzioni almost exact
 % Why do the graphs look the way they look
 
 \section{Conclusion}
+\label{sec:conclusion}
 
-Summarize ToC, contributions, evaluation, outlook
+While working on our project, it became clear that there are myriads of further research questions to pursue. We focused on implementing the toolkit to do so. Our main contributions are:
+
+\begin{enumerate}
+  \item A suffix tree data structure and a clustering algorithm based on it, written in Java,
+  \item A generic lexical chaining algorithm and two concrete instances of it, written in Python,
+  \item A preprocessing pipeline to a TREC corpus of medical documents, written in Python, Java and Shell script,
+  \item A simple document retrieval system based on a vector space model, extendable by the other methods we presented,
+  \item A topic modelling component, based on MALLET and written in Java,
+  \item A term identification component based on KEA and written in Java   
+\end{enumerate} 
+
+In the future, we hope to use the tools developed to evaluate our approach, and publish some of them as open source.
 
 \end{document}
